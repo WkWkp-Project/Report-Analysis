@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X } from 'lucide-react';
-import { fetchAnalysis } from './api.js';
+import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle } from 'lucide-react';
+import { disconnectFacebook, fetchAnalysis, fetchFacebookStatus, refreshFacebookConnection, startFacebookConnection } from './api.js';
 import './styles.css';
 
 // ============ FORMATTERS ============
@@ -636,18 +636,26 @@ const WorkspaceSidebar = ({ view, setView }) => {
   );
 };
 
-const DataSourcesView = ({ data, loading, error, onRefresh }) => {
+const DataSourcesView = ({ loading, onRefresh, facebook, facebookNotice, onFacebookConnect, onFacebookRefresh, onFacebookDisconnect }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const clearFile = () => setSelectedFile(null);
 
-  const sourceReady = Boolean(data && !error);
-  const sourceStatus = loading ? 'กำลังตรวจสอบ' : error ? 'เชื่อมต่อไม่ได้' : sourceReady ? 'พร้อมใช้' : 'รอข้อมูล';
+  const connection = facebook.data?.connection;
+  const pages = connection?.pages || [];
+  const adAccounts = connection?.ad_accounts || [];
+  const grantedScopes = connection?.granted_scopes || [];
+  const declinedScopes = connection?.declined_scopes || [];
+  const connectionExpired = Boolean(facebook.data?.connected && connection?.expired);
+  const facebookConnected = Boolean(facebook.data?.connected && !connectionExpired);
+  const sourceStatus = facebook.loading ? 'กำลังตรวจสอบ' : facebook.error ? 'เชื่อมต่อไม่ได้' : facebookConnected ? 'พร้อมเลือก scope' : 'รอเชื่อมต่อ';
   const metrics = [
     { name: 'Reach & impressions', source: 'Facebook API', status: sourceStatus },
     { name: 'Engagement & reactions', source: 'Facebook API', status: sourceStatus },
-    { name: 'Spend, CPM & CPE', source: data?.counts?.ads ? 'Marketing API / Demo' : 'รอข้อมูล', status: sourceReady && data?.counts?.ads ? 'พร้อมใช้' : sourceStatus },
+    { name: 'Spend, CPM & CPE', source: facebookConnected ? 'Meta Marketing API' : 'รอเชื่อมต่อ', status: sourceStatus },
     { name: 'Revenue & offline conversion', source: 'Excel / CSV', status: 'เพิ่มภายหลัง' },
   ];
+
+  const connectLabel = facebook.connecting ? 'กำลังเปิด Meta' : connectionExpired ? 'เชื่อมต่อ Facebook ใหม่' : facebook.data?.configured ? 'เชื่อมต่อ Facebook' : 'รอการตั้งค่า Meta App';
 
   return (
     <section className="sources-view" aria-labelledby="sources-title">
@@ -664,13 +672,63 @@ const DataSourcesView = ({ data, loading, error, onRefresh }) => {
           <div className="source-icon facebook"><Database size={19} /></div>
           <div>
             <div className="source-title">Facebook data</div>
-            <div className="source-copy">{loading ? 'กำลังตรวจสอบการเชื่อมต่อ' : error ? 'ไม่สามารถอ่านข้อมูลจาก backend' : data?.demo ? 'กำลังใช้ชุดข้อมูลตัวอย่าง' : 'เชื่อมต่อ Graph API และ Marketing API'}</div>
+            <div className="source-copy">{facebook.loading ? 'กำลังตรวจสอบการเชื่อมต่อ' : facebook.error ? 'ไม่สามารถอ่านสถานะ Facebook' : facebookConnected ? `เชื่อมต่อในชื่อ ${connection?.user?.name || 'Facebook user'}` : connectionExpired ? 'Token หมดอายุ ต้องอนุญาตผ่าน Meta ใหม่' : 'ยังไม่ได้เชื่อม Facebook Developer App'}</div>
           </div>
         </div>
-        <div className={`source-health ${error ? 'failed' : ''}`}>{error ? <AlertCircle size={16} /> : <CircleCheck size={16} />} {loading ? 'กำลังตรวจสอบ' : error ? 'ต้องเชื่อมต่อใหม่' : 'พร้อมวิเคราะห์'}</div>
-        <div className="source-stat"><span>Records</span><strong>{data?.counts?.total ?? '–'}</strong></div>
-        <div className="source-stat"><span>Coverage</span><strong>{data?.range ? `${data.range.since} – ${data.range.until}` : '–'}</strong></div>
+        <div className={`source-health ${facebook.error || !facebookConnected ? 'failed' : ''}`}>{facebookConnected ? <CircleCheck size={16} /> : <AlertCircle size={16} />} {facebook.loading ? 'กำลังตรวจสอบ' : facebookConnected ? 'พร้อมกำหนด scope' : 'ต้องเชื่อมต่อ'}</div>
+        <div className="source-stat"><span>Pages</span><strong>{facebookConnected ? pages.length : '–'}</strong></div>
+        <div className="source-stat"><span>Ad accounts</span><strong>{facebookConnected ? adAccounts.length : '–'}</strong></div>
       </div>
+
+      <section className={`connector-panel ${facebookConnected ? 'connected' : ''}`} aria-labelledby="facebook-connector-title">
+        <div className="connector-intro">
+          <div className="connector-symbol"><Link2 size={22} /></div>
+          <div>
+            <div className="connector-title-line">
+              <h2 id="facebook-connector-title">Facebook Developer connection</h2>
+              <span className={`connector-state ${facebookConnected ? 'ready' : ''}`}>{facebookConnected ? 'เชื่อมแล้ว' : connectionExpired ? 'Token หมดอายุ' : facebook.data?.configured ? 'พร้อมเชื่อม' : 'ต้องตั้งค่า'}</span>
+            </div>
+            <p>ล็อกอินผ่าน Meta OAuth เพื่อค้นหา Page และ Ad Account ที่เข้าถึงได้ ก่อนเลือก Campaign และช่วงเวลาในขั้น scope ถัดไป โดย token จะอยู่ฝั่ง backend เท่านั้น</p>
+          </div>
+        </div>
+
+        {facebookNotice && <div className={`connector-notice ${facebookNotice.type}`} role="status">{facebookNotice.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}<span>{facebookNotice.message}</span></div>}
+        {facebook.error && <div className="connector-notice error" role="alert"><AlertCircle size={16} /><span>{facebook.error}</span></div>}
+
+        {facebookConnected ? (
+          <div className="connector-details">
+            <div className="connection-identity">
+              <span>Connected as</span>
+              <strong>{connection.user?.name || 'Facebook user'}</strong>
+              <small>Graph API {connection.graph_version}</small>
+            </div>
+            <div className="resource-summary" aria-label="Facebook resources found">
+              <div><strong>{pages.length}</strong><span>Pages</span></div>
+              <div><strong>{adAccounts.length}</strong><span>Ad accounts</span></div>
+              <div><strong>{grantedScopes.length}</strong><span>Granted</span></div>
+            </div>
+            {declinedScopes.length > 0 && <div className="permission-warning"><AlertTriangle size={15} /><span>Meta ไม่อนุมัติ {declinedScopes.join(', ')} · metric ที่เกี่ยวข้องจะยังไม่ผ่าน validation</span></div>}
+            <div className="connector-actions">
+              <button className="secondary-action" type="button" onClick={onFacebookRefresh} disabled={facebook.connecting}><RefreshCw size={15} /> อ่านบัญชีใหม่</button>
+              <button className="text-action danger" type="button" onClick={onFacebookDisconnect} disabled={facebook.connecting}><Unplug size={15} /> ยกเลิกการเชื่อม</button>
+            </div>
+          </div>
+        ) : (
+          <div className="connector-setup">
+            <div className="setup-proof"><ShieldCheck size={17} /><span>ขอเฉพาะสิทธิ์อ่านรายงาน · ตรวจ OAuth state · เข้ารหัส token ก่อนบันทึก</span></div>
+            {!facebook.data?.configured && (
+              <div className="environment-hint">
+                <span>ตั้งค่าที่ backend ก่อน</span>
+                <code>FB_APP_ID</code><code>FB_APP_SECRET</code>
+              </div>
+            )}
+            <button className="primary-action" type="button" onClick={onFacebookConnect} disabled={!facebook.data?.configured || facebook.connecting}>
+              {facebook.connecting ? <LoaderCircle className="button-spinner" size={17} /> : <ExternalLink size={17} />}
+              {connectLabel}
+            </button>
+          </div>
+        )}
+      </section>
 
       <div className="sources-layout">
         <div className="upload-panel">
@@ -717,7 +775,7 @@ const DataSourcesView = ({ data, loading, error, onRefresh }) => {
             {metrics.map(metric => (
               <div className="coverage-row" key={metric.name}>
                 <div><strong>{metric.name}</strong><span>{metric.source}</span></div>
-                <span className={`coverage-status ${metric.status === 'พร้อมใช้' ? 'ready' : metric.status === 'เชื่อมต่อไม่ได้' ? 'failed' : ''}`}>{metric.status}</span>
+                <span className={`coverage-status ${metric.status === 'พร้อมใช้' ? 'ready' : metric.status === 'พร้อมเลือก scope' ? 'scoped' : metric.status === 'เชื่อมต่อไม่ได้' ? 'failed' : ''}`}>{metric.status}</span>
               </div>
             ))}
           </div>
@@ -735,6 +793,33 @@ export default function Dashboard() {
   const [selectedPost, setSelectedPost] = useState(null);
   const [mode, setMode] = useState('combined');
   const [state, setState] = useState({ loading: true, error: null, data: null });
+  const [facebook, setFacebook] = useState({ loading: true, connecting: false, error: null, data: null });
+  const [facebookNotice, setFacebookNotice] = useState(null);
+
+  const loadFacebookStatus = () => {
+    setFacebook(current => ({ ...current, loading: true, error: null }));
+    return fetchFacebookStatus()
+      .then(data => setFacebook({ loading: false, connecting: false, error: null, data }))
+      .catch(err => setFacebook(current => ({ ...current, loading: false, connecting: false, error: err.message })));
+  };
+
+  useEffect(() => {
+    loadFacebookStatus();
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('facebook');
+    if (result) {
+      setView('sources');
+      const messages = {
+        connected: { type: 'success', message: 'เชื่อมต่อ Facebook สำเร็จ ระบบอ่านรายการบัญชีที่คุณเข้าถึงได้แล้ว' },
+        cancelled: { type: 'error', message: 'ยกเลิกการเชื่อมต่อแล้ว คุณเริ่มใหม่ได้เมื่อพร้อม' },
+        missing_callback: { type: 'error', message: 'Meta ส่งข้อมูลกลับมาไม่ครบ กรุณาเริ่มเชื่อมต่อใหม่' },
+        connection_failed: { type: 'error', message: 'เชื่อมต่อไม่สำเร็จ ตรวจสิทธิ์และ Callback URL ใน Meta App แล้วลองใหม่' },
+        state_mismatch: { type: 'error', message: 'คำขอเชื่อมต่อไม่ตรงกับ browser นี้หรือหมดรอบไปแล้ว กรุณาเริ่มใหม่จากปุ่มเชื่อมต่อ' },
+      };
+      setFacebookNotice(messages[result] || null);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -746,6 +831,37 @@ export default function Dashboard() {
   }, [refreshKey]);
 
   const handleSelect = (post) => { setSelectedPost(post); setTier('post'); };
+  const handleFacebookConnect = async () => {
+    setFacebook(current => ({ ...current, connecting: true, error: null }));
+    setFacebookNotice(null);
+    try {
+      const authorizationUrl = await startFacebookConnection();
+      window.location.assign(authorizationUrl);
+    } catch (err) {
+      setFacebook(current => ({ ...current, connecting: false, error: err.message }));
+    }
+  };
+  const handleFacebookRefresh = async () => {
+    setFacebook(current => ({ ...current, connecting: true, error: null }));
+    try {
+      await refreshFacebookConnection();
+      await loadFacebookStatus();
+      setFacebookNotice({ type: 'success', message: 'อัปเดตรายการ Page และ Ad Account จาก Meta แล้ว' });
+    } catch (err) {
+      setFacebook(current => ({ ...current, connecting: false, error: err.message }));
+    }
+  };
+  const handleFacebookDisconnect = async () => {
+    if (!window.confirm('ยกเลิกการเชื่อม Facebook และลบ token ที่เข้ารหัสไว้ในเครื่องนี้?')) return;
+    setFacebook(current => ({ ...current, connecting: true, error: null }));
+    try {
+      await disconnectFacebook();
+      await loadFacebookStatus();
+      setFacebookNotice({ type: 'success', message: 'ยกเลิกการเชื่อมและลบ token ที่บันทึกไว้แล้ว' });
+    } catch (err) {
+      setFacebook(current => ({ ...current, connecting: false, error: err.message }));
+    }
+  };
   const { loading, error, data } = state;
 
   return (
@@ -766,7 +882,15 @@ export default function Dashboard() {
 
         <div className="workspace-content">
           {view === 'sources' ? (
-            <DataSourcesView data={data} loading={loading} error={error} onRefresh={() => setRefreshKey(key => key + 1)} />
+            <DataSourcesView
+              loading={loading}
+              onRefresh={() => { setRefreshKey(key => key + 1); loadFacebookStatus(); }}
+              facebook={facebook}
+              facebookNotice={facebookNotice}
+              onFacebookConnect={handleFacebookConnect}
+              onFacebookRefresh={handleFacebookRefresh}
+              onFacebookDisconnect={handleFacebookDisconnect}
+            />
           ) : (
             <section className="report-surface" aria-label="Facebook performance report">
               <div className="report-header">

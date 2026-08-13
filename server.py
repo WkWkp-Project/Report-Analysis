@@ -11,14 +11,15 @@ Endpoints
 รัน:  uvicorn server:app --reload --port 8000
 """
 
+import hmac
 import os
 from datetime import date, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from import_pipeline.models import ImportStage, SourceKind
@@ -26,6 +27,7 @@ from import_pipeline.registry import DIMENSIONS, METRICS
 from scoring import PostScorer, calculate_baseline
 from serializer import build_payload
 import topic_extractor
+from facebook_connection import FacebookConnectionError, FacebookOAuthService
 
 load_dotenv()
 
@@ -47,6 +49,10 @@ app.add_middleware(
 
 def _has_credentials() -> bool:
     return bool(os.getenv("FB_PAGE_ACCESS_TOKEN") and os.getenv("FB_PAGE_ID"))
+
+
+def _facebook_service() -> FacebookOAuthService:
+    return FacebookOAuthService()
 
 
 def _run_pipeline(posts_raw: list, page_info: dict, since: str, until: str) -> dict:
@@ -122,6 +128,83 @@ def import_contracts():
             for spec in METRICS.values()
         ],
     }
+
+
+@app.get("/api/facebook/status")
+def facebook_status():
+    """Return safe connection metadata. Access tokens never leave the backend."""
+    try:
+        return _facebook_service().status()
+    except FacebookConnectionError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/api/facebook/oauth/start")
+def facebook_oauth_start(response: Response):
+    """Create a signed OAuth attempt and return Meta's consent URL."""
+    try:
+        service = _facebook_service()
+        state = service.create_state()
+        authorization_url = service.authorization_url(state)
+        response.set_cookie(
+            "fb_oauth_state",
+            state,
+            max_age=600,
+            httponly=True,
+            secure=service.config.redirect_uri.startswith("https://"),
+            samesite="lax",
+            path="/api/facebook/oauth/callback",
+        )
+        return {
+            "authorization_url": authorization_url,
+            "redirect_uri": service.config.redirect_uri,
+        }
+    except FacebookConnectionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/facebook/oauth/callback")
+def facebook_oauth_callback(
+    request: Request,
+    code: str | None = Query(default=None),
+    state: str | None = Query(default=None),
+    error: str | None = Query(default=None),
+):
+    """Exchange the code server-side, encrypt tokens, then return to the app."""
+    service = _facebook_service()
+    stored_state = request.cookies.get("fb_oauth_state")
+    state_matches = bool(state and stored_state and hmac.compare_digest(state, stored_state))
+    if error:
+        target = f"{service.config.frontend_url}/?facebook=cancelled"
+    elif not code or not state:
+        target = f"{service.config.frontend_url}/?facebook=missing_callback"
+    elif not state_matches:
+        target = f"{service.config.frontend_url}/?facebook=state_mismatch"
+    else:
+        try:
+            service.complete_oauth(code, state)
+            target = f"{service.config.frontend_url}/?facebook=connected"
+        except FacebookConnectionError:
+            target = f"{service.config.frontend_url}/?facebook=connection_failed"
+    redirect = RedirectResponse(target, status_code=302)
+    redirect.delete_cookie("fb_oauth_state", path="/api/facebook/oauth/callback")
+    return redirect
+
+
+@app.post("/api/facebook/refresh")
+def facebook_refresh():
+    """Re-read accessible Pages and Ad Accounts from Meta."""
+    try:
+        return _facebook_service().refresh_resources()
+    except FacebookConnectionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.delete("/api/facebook/connection")
+def facebook_disconnect():
+    """Delete this workspace's encrypted Facebook connection."""
+    deleted = _facebook_service().store.delete()
+    return {"disconnected": deleted}
 
 
 @app.get("/api/analyze")

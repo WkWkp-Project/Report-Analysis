@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-13T15:45:01.8645623+07:00",
+  "generatedAt": "2026-08-13T16:45:00+07:00",
   "title": "Design System: Report Analysis",
   "extensions": {
     "colorMeta": {
@@ -41,6 +41,13 @@
     ]
   },
   "components": [
+    {
+      "name": "Primary Source Action",
+      "kind": "button",
+      "description": "Single advancing action for source setup or provider authorization.",
+      "html": "<button class=\"ds-primary-action\" type=\"button\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/></svg>Connect Facebook</button>",
+      "css": ".ds-primary-action{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 14px;border:0;border-radius:10px;background:var(--teal,#0f766e);color:#fff;font:500 11px/1.4 \"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;box-shadow:0 8px 18px rgba(15,118,110,.18);cursor:pointer;transition:background-color 160ms ease-out,box-shadow 160ms ease-out}.ds-primary-action svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-primary-action:hover{background:#0b655f;box-shadow:0 10px 22px rgba(15,118,110,.23)}.ds-primary-action:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:2px}.ds-primary-action:disabled{background:#a6aaa7;box-shadow:none;cursor:not-allowed}"
+    },
     {
       "name": "Secondary Action",
       "kind": "button",
@@ -100,6 +107,13 @@
       "description": "Signature provenance surface combining source identity, readiness, and coverage.",
       "html": "<section class=\"ds-source-band\"><div class=\"ds-source-icon\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><ellipse cx=\"12\" cy=\"5\" rx=\"8\" ry=\"3\"/><path d=\"M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6\"/></svg></div><div><strong>Facebook data</strong><p>Graph API and Marketing API</p></div><span class=\"ds-source-ready\">● Ready to analyze</span><div class=\"ds-source-stat\"><small>RECORDS</small><b>128</b></div></section>",
       "css": ".ds-source-band{display:grid;grid-template-columns:auto minmax(180px,1fr) auto auto;align-items:center;gap:12px;padding:17px 18px;border-radius:14px;background:#1f2927;color:#fff;box-shadow:0 10px 24px rgba(28,25,23,.12);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif}.ds-source-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:rgba(255,255,255,.1);color:#9ce3d5}.ds-source-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-source-band strong{font-size:13px;font-weight:600}.ds-source-band p{margin:3px 0 0;color:#bfcbc8;font-size:10px}.ds-source-ready{color:#9ce3d5;font-size:10px;white-space:nowrap}.ds-source-stat{padding-left:17px;border-left:1px solid rgba(255,255,255,.13)}.ds-source-stat small,.ds-source-stat b{display:block}.ds-source-stat small{color:#aab6b3;font-size:9px;letter-spacing:.05em}.ds-source-stat b{margin-top:5px;font:500 11px/1.4 \"IBM Plex Mono\",monospace}"
+    },
+    {
+      "name": "Connector Lifecycle Panel",
+      "kind": "custom",
+      "description": "Provider identity, connection state, safe setup guidance, permission coverage, and source actions in one lifecycle surface.",
+      "html": "<section class=\"ds-connector ds-connector-connected\"><div class=\"ds-connector-icon\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1\"/></svg></div><div class=\"ds-connector-copy\"><div><strong>Facebook Developer connection</strong><span>Connected</span></div><p>Read-only access for Pages and Ad Accounts; credentials stay on the backend.</p></div><div class=\"ds-connector-evidence\"><b>3<small>Pages</small></b><b>2<small>Ad accounts</small></b><button type=\"button\">Refresh accounts</button></div></section>",
+      "css": ".ds-connector{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;padding:20px;border:1px solid #d9d6cf;border-radius:14px;background:var(--surface,#fff);color:var(--ink,#1c1917);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif}.ds-connector-connected{border-color:#a7d9ce;background:#fbfffd}.ds-connector-icon{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--teal-soft,#e1f5ee);color:var(--teal,#0f766e)}.ds-connector-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-connector-copy>div{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.ds-connector-copy strong{font-size:15px;letter-spacing:-.015em}.ds-connector-copy span{padding:4px 7px;border-radius:999px;background:var(--teal-soft,#e1f5ee);color:#0b645d;font-size:11px}.ds-connector-copy p{max-width:72ch;margin:5px 0 0;color:var(--muted,#68625d);font-size:12px;line-height:1.6}.ds-connector-evidence{grid-column:2;display:flex;align-items:center;gap:1px;margin-top:2px;padding-top:16px;border-top:1px solid #dcefe9}.ds-connector-evidence b{min-width:86px;padding:9px 11px;background:#f1faf7;font:500 13px/1.3 \"IBM Plex Mono\",monospace}.ds-connector-evidence b:first-child{border-radius:10px 0 0 10px}.ds-connector-evidence b:nth-child(2){border-radius:0 10px 10px 0}.ds-connector-evidence small{display:block;margin-top:3px;color:#4d6e68;font:400 9px/1.4 \"IBM Plex Sans Thai\",sans-serif}.ds-connector-evidence button{min-height:36px;margin-left:auto;padding:7px 11px;border:1px solid var(--line,#e7e5e4);border-radius:10px;background:#fff;color:var(--muted,#68625d);font:500 11px/1.4 \"IBM Plex Sans Thai\",sans-serif;cursor:pointer}.ds-connector-evidence button:hover{border-color:#c7c3bc;color:var(--ink,#1c1917)}.ds-connector-evidence button:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:2px}@media(max-width:560px){.ds-connector{grid-template-columns:44px minmax(0,1fr);padding:16px}.ds-connector-evidence{grid-column:1/-1;flex-wrap:wrap}.ds-connector-evidence button{width:100%;margin:8px 0 0}}"
     }
   ],
   "narrative": {
@@ -120,18 +134,21 @@
       { "name": "The Report Leads Rule", "body": "Workspace chrome frames the analysis but never competes with the title, mode control, tier path, or metrics.", "section": "layout" },
       { "name": "The Progressive Density Rule", "body": "Preserve the Overview → Ads vs Organic → Post deep-dive path; reveal detail through navigation rather than placing every metric in one view.", "section": "layout" },
       { "name": "The Flat-by-Default Rule", "body": "Cards and panels rest on borders and tonal contrast; elevation marks selection or source authority, not decoration.", "section": "elevation" },
-      { "name": "The Radius Follows Scale Rule", "body": "Larger containing surfaces receive larger corners, while data cells and tier markers remain tighter and more precise.", "section": "shapes" }
+      { "name": "The Radius Follows Scale Rule", "body": "Larger containing surfaces receive larger corners, while data cells and tier markers remain tighter and more precise.", "section": "shapes" },
+      { "name": "The Lifecycle Before Detail Rule", "body": "A connector must make its current state and next valid action clear before presenting resource metadata or downstream import choices.", "section": "components" }
     ],
     "dos": [
       "**Do** keep analytical evidence visually dominant over workspace chrome.",
       "**Do** use teal sparingly for selected, ready, positive, or directional state.",
       "**Do** preserve IBM Plex Mono for numbers, ranges, grades, and identifiers.",
       "**Do** identify whether a metric comes from an API, file, manual input, or calculation.",
+      "**Do** keep provider identity, connection state, permission coverage, and the next valid action together in one connector lifecycle panel.",
       "**Do** reduce secondary metadata before removing source identity, state, or analytical sequence on smaller screens."
     ],
     "donts": [
       "**Don't** flatten the three-tier report into a single dense dashboard.",
       "**Don't** blend uploaded-file metrics into API data without explicit source and mapping state.",
+      "**Don't** expose tokens, secrets, or credential-like values in connector UI; show only safe configuration keys and sanitized account metadata.",
       "**Don't** use dark Source Ink panels as ordinary decorative cards.",
       "**Don't** add accent colors unless they encode a distinct data category or semantic state.",
       "**Don't** replace fine borders and controlled whitespace with heavy shadows or oversized card spacing."
