@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-13T15:45:01.8645623+07:00",
+  "title": "Design System: Report Analysis",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "neutral", "displayName": "Working Ink", "canonical": "#1c1917", "tonalRamp": ["#1c1917", "#36312e", "#554e49", "#746d67", "#968f89", "#bab5b0", "#dedbd8", "#f4f2f0"] },
+      "text-muted": { "role": "neutral", "displayName": "Measured Gray", "canonical": "#68625d", "tonalRamp": ["#252220", "#403b37", "#5c5651", "#77716b", "#96908a", "#b6b1ac", "#d8d4d0", "#f4f2f0"] },
+      "text-faint": { "role": "neutral", "displayName": "Faint Annotation", "canonical": "#817a74", "tonalRamp": ["#292624", "#47423e", "#625c57", "#817a74", "#9d9791", "#bbb6b1", "#dad6d2", "#f5f3f1"] },
+      "border-stone": { "role": "neutral", "displayName": "Hairline Stone", "canonical": "#e7e5e4", "tonalRamp": ["#2c2a29", "#4d4a48", "#6f6b68", "#928e8b", "#b4b1ae", "#d0cdcb", "#e7e5e4", "#f7f6f5"] },
+      "surface-white": { "role": "neutral", "displayName": "Paper Surface", "canonical": "#ffffff", "tonalRamp": ["#292929", "#4a4a4a", "#6d6d6d", "#919191", "#b5b5b5", "#d6d6d6", "#eeeeee", "#ffffff"] },
+      "canvas-stone": { "role": "neutral", "displayName": "Warm Stone Canvas", "canonical": "#f7f6f3", "tonalRamp": ["#2b2924", "#4c4840", "#6d685d", "#918b7e", "#b4afa4", "#d3d0c8", "#e9e7e1", "#f7f6f3"] },
+      "rail-stone": { "role": "neutral", "displayName": "Quiet Rail Stone", "canonical": "#f0eee9", "tonalRamp": ["#2a2823", "#49463e", "#6a665b", "#8d887b", "#b0ab9f", "#cfcbc3", "#e5e2dc", "#f5f3ef"] },
+      "primary-teal": { "role": "primary", "displayName": "Evidence Teal", "canonical": "#0f766e", "tonalRamp": ["#052724", "#08423d", "#0b5e57", "#0f766e", "#27948a", "#5ab5aa", "#9bd7cf", "#e1f5ee"] },
+      "primary-teal-soft": { "role": "primary", "displayName": "Washed Evidence Teal", "canonical": "#e1f5ee", "tonalRamp": ["#082722", "#0d443c", "#176056", "#277d70", "#54a091", "#8fc2b6", "#c3e1d9", "#eaf8f3"] },
+      "source-ink": { "role": "neutral", "displayName": "Source Ink", "canonical": "#1f2927", "tonalRamp": ["#101715", "#1f2927", "#384541", "#53635f", "#71827e", "#95a4a0", "#bec9c6", "#e9eeec"] },
+      "warning-amber": { "role": "tertiary", "displayName": "Caution Amber", "canonical": "#a16207", "tonalRamp": ["#321d01", "#563302", "#7a4904", "#a16207", "#c9841d", "#e7aa52", "#f5d394", "#fff3d6"] },
+      "danger-red": { "role": "tertiary", "displayName": "Evidence Red", "canonical": "#991b1b", "tonalRamp": ["#310606", "#540c0c", "#761313", "#991b1b", "#bd3434", "#dd6666", "#f1a2a2", "#fee2e2"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Surface Display", "purpose": "Page and report titles; one dominant title per surface." },
+      "title": { "displayName": "Panel Title", "purpose": "Compact structural anchors inside working surfaces." },
+      "body": { "displayName": "Analytical Body", "purpose": "Explanations, recommendations, and row-level reading." },
+      "label": { "displayName": "Operational Label", "purpose": "Metadata, groups, statuses, and micro-headings." },
+      "data": { "displayName": "Evidence Data", "purpose": "Numeric values, grades, ranges, and identifiers." }
+    },
+    "shadows": [
+      { "name": "selected-control", "value": "0 3px 10px rgba(41, 37, 36, 0.07)", "purpose": "Selected segments and report tiers." },
+      { "name": "active-navigation", "value": "0 5px 14px rgba(41, 37, 36, 0.06)", "purpose": "Current workspace destination." },
+      { "name": "source-authority", "value": "0 10px 24px rgba(28, 25, 23, 0.12)", "purpose": "Source-health band only." }
+    ],
+    "motion": [
+      { "name": "state-change", "value": "160ms ease-out", "purpose": "Hover and low-stakes color or border changes." },
+      { "name": "report-settle", "value": "380ms cubic-bezier(.16, 1, .3, 1)", "purpose": "Short upward settle when report content changes." },
+      { "name": "loading-spin", "value": "900ms linear infinite", "purpose": "Backend loading indicator; disabled for reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "workspace-compact", "value": "1120px" },
+      { "name": "mobile", "value": "700px" },
+      { "name": "mobile-narrow", "value": "430px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Secondary Action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Compact utility action for refresh and source-health access.",
+      "html": "<button class=\"ds-secondary-action\" type=\"button\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M20 12a8 8 0 1 1-2.34-5.66L20 8M20 3v5h-5\"/></svg>Check status</button>",
+      "css": ".ds-secondary-action{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:7px 11px;border:1px solid var(--line,#e7e5e4);border-radius:10px;background:var(--surface,#fff);color:#57534e;font:500 11px/1.4 \"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;cursor:pointer;transition:border-color 160ms ease-out,color 160ms ease-out}.ds-secondary-action svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-secondary-action:hover{border-color:#c7c3bc;color:var(--ink,#1c1917)}.ds-secondary-action:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:2px}"
+    },
+    {
+      "name": "Active Workspace Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "Selected destination in the quiet workspace rail.",
+      "html": "<button class=\"ds-nav-active\" type=\"button\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 19V9M10 19V5M16 19v-7M22 19H2\"/></svg><span>Facebook Performance</span></button>",
+      "css": ".ds-nav-active{width:220px;min-height:40px;display:flex;align-items:center;gap:10px;padding:9px 10px;border:0;border-radius:10px;background:var(--surface,#fff);color:var(--teal,#0f766e);font:500 12px/1.4 \"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;text-align:left;box-shadow:0 5px 14px rgba(41,37,36,.06);cursor:pointer}.ds-nav-active svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-nav-active:hover{color:#0b645d}.ds-nav-active:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:2px}"
+    },
+    {
+      "name": "Report Mode Control",
+      "kind": "custom",
+      "description": "Recessed segmented control for Combined, Organic, and Paid modes.",
+      "html": "<div class=\"ds-mode-switch\" role=\"group\" aria-label=\"Report mode\"><button class=\"ds-mode-active\">Combined</button><button>Organic</button><button>Paid</button></div>",
+      "css": ".ds-mode-switch{display:inline-flex;gap:3px;padding:3px;border-radius:9px;background:#ebe8e2;font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif}.ds-mode-switch button{min-height:30px;padding:5px 12px;border:0;border-radius:7px;background:transparent;color:var(--muted,#68625d);font-family:inherit;font-size:11px;font-weight:400;line-height:1.4;cursor:pointer}.ds-mode-switch button:hover{color:var(--ink,#1c1917)}.ds-mode-switch .ds-mode-active{background:var(--surface,#fff);color:var(--ink,#1c1917);font-weight:500;box-shadow:0 3px 10px rgba(41,37,36,.07)}.ds-mode-switch button:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:1px}"
+    },
+    {
+      "name": "Tier Path",
+      "kind": "nav",
+      "description": "Visible three-step path from overview to post evidence.",
+      "html": "<nav class=\"ds-tier-path\" aria-label=\"Report depth\"><button class=\"ds-tier-active\"><span>1</span>Overview</button><b>›</b><button><span>2</span>Ads vs Organic</button><b>›</b><button disabled><span>3</span>Post deep-dive</button></nav>",
+      "css": ".ds-tier-path{display:flex;align-items:center;gap:5px;padding:7px;border:1px solid var(--line,#e7e5e4);border-radius:12px;background:rgba(255,255,255,.72);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif}.ds-tier-path button{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:6px 10px;white-space:nowrap;border:0;border-radius:8px;background:transparent;color:#8b8580;font-size:11px;cursor:pointer}.ds-tier-path button span{width:19px;height:19px;display:grid;place-items:center;border-radius:6px;background:#eeece7;color:#78716c;font:500 9px/1 \"IBM Plex Mono\",monospace}.ds-tier-path b{color:#c7c3bc;font-weight:400}.ds-tier-path .ds-tier-active{background:var(--surface,#fff);color:var(--ink,#1c1917);font-weight:500;box-shadow:0 3px 10px rgba(41,37,36,.06)}.ds-tier-path .ds-tier-active span{background:var(--teal,#0f766e);color:#fff}.ds-tier-path button:disabled{cursor:not-allowed;opacity:.48}.ds-tier-path button:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:1px}"
+    },
+    {
+      "name": "Evidence Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat bordered card for compact KPI evidence.",
+      "html": "<article class=\"ds-evidence-card\"><div class=\"ds-evidence-label\">Reach</div><strong>482.6K</strong><p>Organic 318.4K · Paid 164.2K</p></article>",
+      "css": ".ds-evidence-card{width:220px;padding:14px 16px;border:.5px solid var(--line,#e7e5e4);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#1c1917);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif}.ds-evidence-label{color:#78716c;font-size:10px;letter-spacing:.5px;text-transform:uppercase}.ds-evidence-card strong{display:block;margin-top:2px;font:500 16px/1.4 \"IBM Plex Mono\",monospace}.ds-evidence-card p{margin:4px 0 0;color:#78716c;font-size:10px;line-height:1.5}"
+    },
+    {
+      "name": "Ready Status Chip",
+      "kind": "chip",
+      "refersTo": "status-ready",
+      "description": "Compact availability state for metric coverage.",
+      "html": "<span class=\"ds-status-ready\">Ready</span>",
+      "css": ".ds-status-ready{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:var(--teal-soft,#e1f5ee);color:#0b645d;font:500 9px/1.4 \"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;white-space:nowrap}"
+    },
+    {
+      "name": "File Upload Zone",
+      "kind": "input",
+      "description": "Explicit supplemental-data entry point, separate from API-backed evidence.",
+      "html": "<label class=\"ds-upload-zone\" tabindex=\"0\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 16V4M7 9l5-5 5 5M5 20h14\"/></svg><strong>Choose a file</strong><span>.xlsx, .xls, or .csv · confirm mapping before merge</span></label>",
+      "css": ".ds-upload-zone{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px;border:1px dashed #b9b4ac;border-radius:12px;background:#faf9f7;color:var(--ink,#1c1917);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;text-align:center;cursor:pointer;transition:border-color 160ms ease-out,background-color 160ms ease-out}.ds-upload-zone svg{width:42px;height:42px;padding:10px;border-radius:12px;background:var(--teal-soft,#e1f5ee);color:var(--teal,#0f766e);fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-upload-zone strong{font-size:12px}.ds-upload-zone span{max-width:340px;color:var(--muted,#68625d);font-size:10px;line-height:1.55}.ds-upload-zone:hover{border-color:var(--teal,#0f766e);background:#f3faf8}.ds-upload-zone:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:2px}"
+    },
+    {
+      "name": "Source Health Band",
+      "kind": "custom",
+      "description": "Signature provenance surface combining source identity, readiness, and coverage.",
+      "html": "<section class=\"ds-source-band\"><div class=\"ds-source-icon\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><ellipse cx=\"12\" cy=\"5\" rx=\"8\" ry=\"3\"/><path d=\"M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6\"/></svg></div><div><strong>Facebook data</strong><p>Graph API and Marketing API</p></div><span class=\"ds-source-ready\">● Ready to analyze</span><div class=\"ds-source-stat\"><small>RECORDS</small><b>128</b></div></section>",
+      "css": ".ds-source-band{display:grid;grid-template-columns:auto minmax(180px,1fr) auto auto;align-items:center;gap:12px;padding:17px 18px;border-radius:14px;background:#1f2927;color:#fff;box-shadow:0 10px 24px rgba(28,25,23,.12);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif}.ds-source-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:rgba(255,255,255,.1);color:#9ce3d5}.ds-source-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-source-band strong{font-size:13px;font-weight:600}.ds-source-band p{margin:3px 0 0;color:#bfcbc8;font-size:10px}.ds-source-ready{color:#9ce3d5;font-size:10px;white-space:nowrap}.ds-source-stat{padding-left:17px;border-left:1px solid rgba(255,255,255,.13)}.ds-source-stat small,.ds-source-stat b{display:block}.ds-source-stat small{color:#aab6b3;font-size:9px;letter-spacing:.05em}.ds-source-stat b{margin-top:5px;font:500 11px/1.4 \"IBM Plex Mono\",monospace}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Analyst's Field Desk",
+    "overview": "Report Analysis feels like a well-kept working desk for evidence: warm stone surrounds quiet white work surfaces, ink typography carries the analysis, and restrained teal identifies trusted state and direction. The system is compact and serious without becoming cold; hierarchy, rhythm, and source clarity do the expressive work.\n\nThe visual system extends the incumbent three-tier report rather than reframing it. Workspace chrome stays quiet, analytical content remains dominant, and supplemental-file workflows are visibly adjacent to—not blended with—API-backed evidence.",
+    "keyCharacteristics": [
+      "Warm, low-contrast workspace framing around crisp white analytical surfaces.",
+      "Compact IBM Plex typography with monospaced treatment reserved for data and identifiers.",
+      "Restrained teal for active, ready, positive, and directional states.",
+      "Fine stone borders, selective elevation, and progressive disclosure instead of ornamental decoration."
+    ],
+    "rules": [
+      { "name": "The One Trusted Voice Rule", "body": "Teal is the only global accent; reserve it for state, direction, and evidence that is ready to act on.", "section": "colors" },
+      { "name": "The Provenance Contrast Rule", "body": "Dark Source Ink belongs to source-health and provenance context, not ordinary content cards.", "section": "colors" },
+      { "name": "The Semantic Color Rule", "body": "Amber and red must encode an actual warning, failure, or negative analytical result.", "section": "colors" },
+      { "name": "The Data Has a Texture Rule", "body": "Use IBM Plex Mono for values and identifiers, never as a blanket body face.", "section": "typography" },
+      { "name": "The Compact, Not Cramped Rule", "body": "Small labels rely on weight, spacing, and contrast; do not compensate with dense all-caps paragraphs.", "section": "typography" },
+      { "name": "The Report Leads Rule", "body": "Workspace chrome frames the analysis but never competes with the title, mode control, tier path, or metrics.", "section": "layout" },
+      { "name": "The Progressive Density Rule", "body": "Preserve the Overview → Ads vs Organic → Post deep-dive path; reveal detail through navigation rather than placing every metric in one view.", "section": "layout" },
+      { "name": "The Flat-by-Default Rule", "body": "Cards and panels rest on borders and tonal contrast; elevation marks selection or source authority, not decoration.", "section": "elevation" },
+      { "name": "The Radius Follows Scale Rule", "body": "Larger containing surfaces receive larger corners, while data cells and tier markers remain tighter and more precise.", "section": "shapes" }
+    ],
+    "dos": [
+      "**Do** keep analytical evidence visually dominant over workspace chrome.",
+      "**Do** use teal sparingly for selected, ready, positive, or directional state.",
+      "**Do** preserve IBM Plex Mono for numbers, ranges, grades, and identifiers.",
+      "**Do** identify whether a metric comes from an API, file, manual input, or calculation.",
+      "**Do** reduce secondary metadata before removing source identity, state, or analytical sequence on smaller screens."
+    ],
+    "donts": [
+      "**Don't** flatten the three-tier report into a single dense dashboard.",
+      "**Don't** blend uploaded-file metrics into API data without explicit source and mapping state.",
+      "**Don't** use dark Source Ink panels as ordinary decorative cards.",
+      "**Don't** add accent colors unless they encode a distinct data category or semantic state.",
+      "**Don't** replace fine borders and controlled whitespace with heavy shadows or oversized card spacing."
+    ]
+  }
+}

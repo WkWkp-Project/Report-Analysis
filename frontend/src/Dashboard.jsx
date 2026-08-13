@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt } from 'lucide-react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
+import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X } from 'lucide-react';
 import { fetchAnalysis } from './api.js';
+import './styles.css';
 
 // ============ FORMATTERS ============
 const fmt = (n) => {
@@ -53,9 +54,9 @@ const SectionTitle = ({ num, title }) => (
 
 const MetricBox = ({ label, value, sub, good, warn, mini }) => (
   <div>
-    <div style={{ fontSize: 10, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+    <div style={{ fontSize: 10, color: '#78716C', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
     <div style={{ fontSize: mini ? 13 : 16, fontWeight: 500, marginTop: 2, color: warn ? '#CA8A04' : 'inherit', ...monoStyle }}>{value}</div>
-    {sub && <div style={{ fontSize: 10, color: good ? '#0F766E' : '#A8A29E', marginTop: 2 }}>{sub}</div>}
+    {sub && <div style={{ fontSize: 10, color: good ? '#0F766E' : '#78716C', marginTop: 2 }}>{sub}</div>}
   </div>
 );
 
@@ -63,7 +64,7 @@ const Row = ({ label, value, sub, good, warn }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingBottom: 6, borderBottom: '0.5px solid #F5F5F4' }}>
     <div>
       <div style={{ fontSize: 12, color: '#57534E' }}>{label}</div>
-      {sub && <div style={{ fontSize: 10, color: '#A8A29E', marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 10, color: '#78716C', marginTop: 2 }}>{sub}</div>}
     </div>
     <div style={{ fontSize: 14, fontWeight: 500, color: good ? '#0F766E' : warn ? '#CA8A04' : 'inherit', ...monoStyle }}>{value}</div>
   </div>
@@ -74,7 +75,7 @@ const HealthRow = ({ status, text, last }) => {
     good: { icon: <CheckCircle2 size={16} color="#0F766E" />, color: '#0F766E', label: 'ดี' },
     warn: { icon: <AlertTriangle size={16} color="#CA8A04" />, color: '#CA8A04', label: 'เตือน' },
     bad: { icon: <AlertCircle size={16} color="#991B1B" />, color: '#991B1B', label: 'ต่ำ' },
-    na: { icon: <AlertCircle size={16} color="#A8A29E" />, color: '#A8A29E', label: 'N/A' },
+    na: { icon: <AlertCircle size={16} color="#78716C" />, color: '#78716C', label: 'N/A' },
   }[status] || {};
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', borderBottom: last ? 'none' : '0.5px solid #F5F5F4' }}>
@@ -106,7 +107,7 @@ const CompareRow = ({ label, value, muted }) => (
 );
 
 const RecBlock = ({ icon, title, color, bg, textColor, items }) => (
-  <div style={{ background: bg, padding: '12px 14px', borderLeft: `3px solid ${color}`, borderRadius: '0 8px 8px 0', marginBottom: 10 }}>
+  <div style={{ background: bg, padding: '12px 14px', borderLeft: `1px solid ${color}`, borderRadius: '0 8px 8px 0', marginBottom: 10 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
       {icon}
       <div style={{ fontSize: 13, fontWeight: 500, color: textColor }}>{title}</div>
@@ -135,12 +136,12 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+      <div className="overview-kpi-grid" style={{ marginBottom: 16 }}>
         {kpis.map(k => (
           <div key={k.label} style={{ flex: 1, background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: '14px 16px' }}>
             <div style={{ fontSize: 11, color: '#78716C', textTransform: 'uppercase', letterSpacing: 0.5 }}>{k.label}</div>
             <div style={{ fontSize: 24, fontWeight: 500, marginTop: 4, ...monoStyle }}>{k.v}</div>
-            <div style={{ fontSize: 10, color: '#A8A29E', marginTop: 4 }}>{k.sub}</div>
+            <div style={{ fontSize: 10, color: '#78716C', marginTop: 4 }}>{k.sub}</div>
           </div>
         ))}
       </div>
@@ -150,7 +151,7 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
           <div style={{ fontSize: 12, fontWeight: 500, color: '#57534E', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Top performers</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {posts.slice(0, 5).map(p => (
-              <div key={p.id} onClick={() => onSelectPost(p)} style={{ cursor: 'pointer', display: 'flex', gap: 10, padding: 10, background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, alignItems: 'center' }}
+              <button type="button" key={p.id} onClick={() => onSelectPost(p)} style={{ width: '100%', cursor: 'pointer', display: 'flex', gap: 10, padding: 10, background: 'white', color: 'inherit', border: '0.5px solid #E7E5E4', borderRadius: 8, alignItems: 'center', textAlign: 'left' }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = '#0F766E'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#E7E5E4'}>
                 <div style={{ width: 36, height: 36, background: FormatBg(p.format), borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 500, color: FormatColor(p.format) }}>{p.format.slice(0, 2)}</div>
@@ -159,7 +160,7 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
                   <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 500, color: gradeColor(p.grade), ...monoStyle, flexShrink: 0 }}>{p.score ?? '–'}</div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -171,7 +172,7 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
               {data.format_perf.map(f => (
                 <div key={f.format}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                    <span>{f.format} <span style={{ color: '#A8A29E', fontSize: 10 }}>· n={f.count}</span></span>
+                    <span>{f.format} <span style={{ color: '#78716C', fontSize: 10 }}>· n={f.count}</span></span>
                     <span style={{ fontWeight: 500, ...monoStyle }}>{f.ER}%</span>
                   </div>
                   <div style={{ height: 5, background: '#F5F5F4', borderRadius: 3, overflow: 'hidden' }}>
@@ -188,7 +189,7 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
         <div>
           <div style={{ fontSize: 12, fontWeight: 500, color: '#57534E', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>ช่วงเวลา engagement สูง</div>
           <div style={{ background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '24px repeat(6, 1fr)', gap: 3, fontSize: 9, color: '#A8A29E', marginBottom: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '24px repeat(6, 1fr)', gap: 3, fontSize: 9, color: '#78716C', marginBottom: 4 }}>
               <div></div>
               {[6, 10, 14, 18, 21, 24].map(h => <div key={h} style={{ textAlign: 'center' }}>{h}</div>)}
             </div>
@@ -245,7 +246,7 @@ const TierAdsOrganic = ({ data }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 8, height: 8, borderRadius: 4, background: '#0F766E' }}></div>
             <div style={{ fontSize: 13, fontWeight: 500 }}>Organic</div>
-            <div style={{ fontSize: 11, color: '#A8A29E', marginLeft: 'auto' }}>n = {organic.length} posts</div>
+            <div style={{ fontSize: 11, color: '#78716C', marginLeft: 'auto' }}>n = {organic.length} posts</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Row label="Reach" value={fmt(o.reach)} />
@@ -258,7 +259,7 @@ const TierAdsOrganic = ({ data }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 8, height: 8, borderRadius: 4, background: '#C2410C' }}></div>
             <div style={{ fontSize: 13, fontWeight: 500 }}>Paid</div>
-            <div style={{ fontSize: 11, color: '#A8A29E', marginLeft: 'auto' }}>n = {paid.length} ads</div>
+            <div style={{ fontSize: 11, color: '#78716C', marginLeft: 'auto' }}>n = {paid.length} ads</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Row label="Reach" value={fmt(pp.reach)} />
@@ -281,19 +282,19 @@ const TierAdsOrganic = ({ data }) => {
                     <span style={{ fontSize: 12 }}>{c.name}</span>
                     <div style={{ position: 'relative', height: 5, background: '#F5F5F4', borderRadius: 3 }}>
                       {c.value >= 0
-                        ? <div style={{ position: 'absolute', left: '50%', width: `${w / 2}%`, height: '100%', background: w > 30 ? '#0F766E' : '#A8A29E', borderRadius: '0 3px 3px 0' }}></div>
-                        : <div style={{ position: 'absolute', right: '50%', width: `${w / 2}%`, height: '100%', background: w > 30 ? '#991B1B' : '#A8A29E', borderRadius: '3px 0 0 3px' }}></div>}
+                        ? <div style={{ position: 'absolute', left: '50%', width: `${w / 2}%`, height: '100%', background: w > 30 ? '#0F766E' : '#78716C', borderRadius: '0 3px 3px 0' }}></div>
+                        : <div style={{ position: 'absolute', right: '50%', width: `${w / 2}%`, height: '100%', background: w > 30 ? '#991B1B' : '#78716C', borderRadius: '3px 0 0 3px' }}></div>}
                       <div style={{ position: 'absolute', left: '50%', top: -2, width: 1, height: 9, background: '#D6D3D1' }}></div>
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 500, textAlign: 'right', color: c.value >= 0.3 ? '#0F766E' : c.value <= -0.3 ? '#991B1B' : '#A8A29E', ...monoStyle }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, textAlign: 'right', color: c.value >= 0.3 ? '#0F766E' : c.value <= -0.3 ? '#991B1B' : '#78716C', ...monoStyle }}>
                       {c.value > 0 ? '+' : ''}{c.value.toFixed(2)}
                     </span>
                   </div>
                 );
               })}
-              <div style={{ fontSize: 10, color: '#A8A29E', marginTop: 4 }}>Pearson correlation · n = {data.correlations[0]?.n ?? '?'} posts</div>
+              <div style={{ fontSize: 10, color: '#78716C', marginTop: 4 }}>Pearson correlation · n = {data.correlations[0]?.n ?? '?'} posts</div>
             </div>
-          ) : <div style={{ fontSize: 12, color: '#A8A29E' }}>ต้องการ ≥ 5 โพสต์สำหรับ correlation analysis</div>}
+          ) : <div style={{ fontSize: 12, color: '#78716C' }}>ต้องการ ≥ 5 โพสต์สำหรับ correlation analysis</div>}
         </div>
       </div>
 
@@ -305,7 +306,7 @@ const TierAdsOrganic = ({ data }) => {
               <div key={i} style={{ background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: 14 }}>
                 <div style={{ fontSize: 10, color: '#78716C', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>{p.label}</div>
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{p.value}</div>
-                <div style={{ fontSize: 11, color: '#A8A29E' }}>{p.detail}</div>
+                <div style={{ fontSize: 11, color: '#78716C' }}>{p.detail}</div>
               </div>
             ))}
           </div>
@@ -362,7 +363,7 @@ const TierPostDetail = ({ post: p, baseline }) => {
             <span style={{ fontSize: 10, padding: '2px 7px', background: '#F5F5F4', color: '#525252', borderRadius: 999 }}>{p.objective}</span>
           </div>
           <div style={{ fontSize: 14, fontWeight: 500 }}>{p.title}</div>
-          <div style={{ fontSize: 10, color: '#A8A29E', marginTop: 4, ...monoStyle }}>post_id {p.id} · {p.date} {p.time}</div>
+          <div style={{ fontSize: 10, color: '#78716C', marginTop: 4, ...monoStyle }}>post_id {p.id} · {p.date} {p.time}</div>
         </div>
         <div style={{ paddingLeft: 14, borderLeft: '0.5px solid #E7E5E4' }}>
           <GradeChip grade={p.grade} score={p.score} />
@@ -416,9 +417,9 @@ const TierPostDetail = ({ post: p, baseline }) => {
         </div>
         {rxnTotal > 0 && (
           <>
-            <div style={{ fontSize: 10, color: '#A8A29E', marginBottom: 6 }}>Reactions · {fmt(rxnTotal)} total</div>
+            <div style={{ fontSize: 10, color: '#78716C', marginBottom: 6 }}>Reactions · {fmt(rxnTotal)} total</div>
             <div style={{ display: 'flex', height: 14, borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
-              {[{ type: 'like', color: '#3B82F6' }, { type: 'love', color: '#EC4899' }, { type: 'wow', color: '#F59E0B' }, { type: 'haha', color: '#EAB308' }, { type: 'sad', color: '#A8A29E' }, { type: 'angry', color: '#737373' }].map(r => {
+              {[{ type: 'like', color: '#3B82F6' }, { type: 'love', color: '#EC4899' }, { type: 'wow', color: '#F59E0B' }, { type: 'haha', color: '#EAB308' }, { type: 'sad', color: '#78716C' }, { type: 'angry', color: '#737373' }].map(r => {
                 const w = (p.reactions[r.type] / rxnTotal) * 100;
                 return <div key={r.type} style={{ background: r.color, width: `${w}%`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'white', fontWeight: 500 }}>{w > 8 ? `${r.type} ${fmt(p.reactions[r.type])}` : ''}</div>;
               })}
@@ -441,7 +442,7 @@ const TierPostDetail = ({ post: p, baseline }) => {
               <MetricBox label="CPE" value={p.cpe != null ? `฿${p.cpe}` : 'N/A'} />
               <MetricBox label="ROAS" value={p.roas != null ? `${p.roas}×` : 'N/A'} sub={p.roas == null ? 'ไม่ใช่ conversion' : null} />
             </div>
-            <div style={{ fontSize: 10, color: '#A8A29E', marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #F5F5F4' }}>เปรียบเทียบเฉพาะกับ ads · {p.objective} — ไม่นำไปเทียบ objective อื่น</div>
+            <div style={{ fontSize: 10, color: '#78716C', marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #F5F5F4' }}>เปรียบเทียบเฉพาะกับ ads · {p.objective} — ไม่นำไปเทียบ objective อื่น</div>
           </div>
         </>
       )}
@@ -501,19 +502,19 @@ const TierPostDetail = ({ post: p, baseline }) => {
             <CompareRow label="CPE" value={baseline.CPE != null ? `฿${baseline.CPE}` : 'N/A'} muted />
           </div>
         </div>
-        <div style={{ fontSize: 10, color: '#A8A29E', marginTop: 12, paddingTop: 10, borderTop: '0.5px solid #F5F5F4' }}>baseline = median ของเพจเอง · n = {baseline.posts_90d ?? '?'} · ไม่นำมาเทียบกับ industry benchmark</div>
+        <div style={{ fontSize: 10, color: '#78716C', marginTop: 12, paddingTop: 10, borderTop: '0.5px solid #F5F5F4' }}>baseline = median ของเพจเอง · n = {baseline.posts_90d ?? '?'} · ไม่นำมาเทียบกับ industry benchmark</div>
       </div>
 
       <SectionTitle title="Recommendations · ต่อเนื่อง 3 ระยะ" />
       {recs.now.length > 0 && <RecBlock icon={<Bolt size={16} color="#0F766E" />} title="ตอนนี้" color="#0F766E" bg="#E1F5EE" textColor="#064E3B" items={recs.now} />}
       {recs.next.length > 0 && <RecBlock icon={<Copy size={16} color="#CA8A04" />} title="โพสต์ถัดไป" color="#CA8A04" bg="#FEF3C7" textColor="#713F12" items={recs.next} />}
-      {recs.long.length > 0 && <RecBlock icon={<Trophy size={16} color="#525252" />} title="ระยะยาว" color="#A8A29E" bg="#F5F5F4" textColor="#44403C" items={recs.long} />}
+      {recs.long.length > 0 && <RecBlock icon={<Trophy size={16} color="#525252" />} title="ระยะยาว" color="#78716C" bg="#F5F5F4" textColor="#44403C" items={recs.long} />}
     </div>
   );
 };
 
 const DeltaCell = ({ value, invertGood }) => {
-  if (value == null) return <div style={{ color: '#A8A29E' }}>–</div>;
+  if (value == null) return <div style={{ color: '#78716C' }}>–</div>;
   const positive = value.startsWith('+');
   const good = invertGood ? positive : positive;
   return <div style={{ color: good ? '#0F766E' : '#991B1B' }}>{value}</div>;
@@ -582,8 +583,154 @@ function buildRecommendations(p, er) {
   return recs;
 }
 
+const WorkspaceSidebar = ({ view, setView }) => {
+  const items = [
+    { id: 'report', label: 'Facebook Performance', icon: BarChart3 },
+    { id: 'sources', label: 'Data sources', icon: Database },
+  ];
+  const planned = [
+    { label: 'Saved reports', icon: Layers3 },
+    { label: 'Metric library', icon: FileSpreadsheet },
+  ];
+
+  return (
+    <aside className="workspace-sidebar" aria-label="Workspace navigation">
+      <div className="workspace-brand">
+        <div className="brand-mark" aria-hidden="true">RA</div>
+        <div>
+          <div className="brand-name">Report Analysis</div>
+          <div className="brand-subtitle">Marketing intelligence</div>
+        </div>
+      </div>
+
+      <nav className="workspace-nav">
+        <div className="nav-group-name">Workspace</div>
+        {items.map(item => {
+          const Icon = item.icon;
+          return (
+            <button key={item.id} className={`nav-item ${view === item.id ? 'active' : ''}`} aria-label={item.label} onClick={() => setView(item.id)}>
+              <Icon size={17} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+
+        <div className="nav-group-name nav-group-spaced">Coming next</div>
+        {planned.map(item => {
+          const Icon = item.icon;
+          return (
+            <button key={item.label} className="nav-item planned" aria-label={`${item.label} — กำลังวางแผน`} disabled>
+              <Icon size={17} />
+              <span>{item.label}</span>
+              <span className="planned-dot" aria-label="กำลังวางแผน"></span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="sidebar-footer">
+        <button className="nav-item planned" disabled><Settings size={17} /><span>Settings</span></button>
+        <div className="workspace-version">UI foundation · v1</div>
+      </div>
+    </aside>
+  );
+};
+
+const DataSourcesView = ({ data, loading, error, onRefresh }) => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const clearFile = () => setSelectedFile(null);
+
+  const sourceReady = Boolean(data && !error);
+  const sourceStatus = loading ? 'กำลังตรวจสอบ' : error ? 'เชื่อมต่อไม่ได้' : sourceReady ? 'พร้อมใช้' : 'รอข้อมูล';
+  const metrics = [
+    { name: 'Reach & impressions', source: 'Facebook API', status: sourceStatus },
+    { name: 'Engagement & reactions', source: 'Facebook API', status: sourceStatus },
+    { name: 'Spend, CPM & CPE', source: data?.counts?.ads ? 'Marketing API / Demo' : 'รอข้อมูล', status: sourceReady && data?.counts?.ads ? 'พร้อมใช้' : sourceStatus },
+    { name: 'Revenue & offline conversion', source: 'Excel / CSV', status: 'เพิ่มภายหลัง' },
+  ];
+
+  return (
+    <section className="sources-view" aria-labelledby="sources-title">
+      <div className="surface-heading">
+        <div>
+          <h1 id="sources-title">Data sources</h1>
+          <p>ดูว่าตัวเลขในรายงานมาจากไหน และเตรียมไฟล์เสริมสำหรับ metric ที่ API ไม่มี</p>
+        </div>
+        <button className="secondary-action" type="button" onClick={onRefresh} disabled={loading}><RefreshCw size={16} /> {loading ? 'กำลังตรวจสอบ' : 'ตรวจสอบสถานะ'}</button>
+      </div>
+
+      <div className="source-status-band">
+        <div className="source-status-primary">
+          <div className="source-icon facebook"><Database size={19} /></div>
+          <div>
+            <div className="source-title">Facebook data</div>
+            <div className="source-copy">{loading ? 'กำลังตรวจสอบการเชื่อมต่อ' : error ? 'ไม่สามารถอ่านข้อมูลจาก backend' : data?.demo ? 'กำลังใช้ชุดข้อมูลตัวอย่าง' : 'เชื่อมต่อ Graph API และ Marketing API'}</div>
+          </div>
+        </div>
+        <div className={`source-health ${error ? 'failed' : ''}`}>{error ? <AlertCircle size={16} /> : <CircleCheck size={16} />} {loading ? 'กำลังตรวจสอบ' : error ? 'ต้องเชื่อมต่อใหม่' : 'พร้อมวิเคราะห์'}</div>
+        <div className="source-stat"><span>Records</span><strong>{data?.counts?.total ?? '–'}</strong></div>
+        <div className="source-stat"><span>Coverage</span><strong>{data?.range ? `${data.range.since} – ${data.range.until}` : '–'}</strong></div>
+      </div>
+
+      <div className="sources-layout">
+        <div className="upload-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>เติมข้อมูลด้วย Excel หรือ CSV</h2>
+              <p>ใช้เมื่อ API ไม่มี revenue, offline conversion หรือ metric ภายในทีม</p>
+            </div>
+            <FileSpreadsheet size={20} />
+          </div>
+
+          {!selectedFile ? (
+            <label className="upload-zone" htmlFor="report-file-upload">
+              <input id="report-file-upload" type="file" accept=".xlsx,.xls,.csv" onChange={e => setSelectedFile(e.target.files?.[0] || null)} />
+              <span className="upload-icon"><Upload size={21} /></span>
+              <strong>เลือกไฟล์จากเครื่อง</strong>
+              <span>รองรับ .xlsx, .xls และ .csv · ระบบจะยังไม่รวมข้อมูลจนกว่าจะยืนยัน mapping</span>
+            </label>
+          ) : (
+            <div className="selected-file" role="status">
+              <div className="file-icon"><FileSpreadsheet size={22} /></div>
+              <div className="file-details">
+                <strong>{selectedFile.name}</strong>
+                <span>{(selectedFile.size / 1024).toFixed(1)} KB · พร้อมเข้าสู่ขั้นตอน column mapping</span>
+              </div>
+              <button className="icon-action" onClick={clearFile} aria-label="นำไฟล์ออก"><X size={17} /></button>
+            </div>
+          )}
+
+          <div className="mapping-note">
+            <AlertCircle size={16} />
+            <span>รอบนี้เป็น UI foundation: ไฟล์ยังไม่ถูกส่งเข้า backend หรือบันทึกไว้ที่ใด</span>
+          </div>
+        </div>
+
+        <div className="coverage-panel">
+          <div className="panel-heading compact">
+            <div>
+              <h2>Metric coverage</h2>
+              <p>แหล่งข้อมูลที่ใช้กับรายงานปัจจุบัน</p>
+            </div>
+          </div>
+          <div className="coverage-list">
+            {metrics.map(metric => (
+              <div className="coverage-row" key={metric.name}>
+                <div><strong>{metric.name}</strong><span>{metric.source}</span></div>
+                <span className={`coverage-status ${metric.status === 'พร้อมใช้' ? 'ready' : metric.status === 'เชื่อมต่อไม่ได้' ? 'failed' : ''}`}>{metric.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 // ============ MAIN APP ============
 export default function Dashboard() {
+  const [view, setView] = useState('report');
+  const [refreshKey, setRefreshKey] = useState(0);
   const [tier, setTier] = useState('overview');
   const [selectedPost, setSelectedPost] = useState(null);
   const [mode, setMode] = useState('combined');
@@ -596,64 +743,82 @@ export default function Dashboard() {
       .then(data => { if (alive) setState({ loading: false, error: null, data }); })
       .catch(err => { if (alive) setState({ loading: false, error: err.message, data: null }); });
     return () => { alive = false; };
-  }, []);
+  }, [refreshKey]);
 
   const handleSelect = (post) => { setSelectedPost(post); setTier('post'); };
   const { loading, error, data } = state;
 
   return (
-    <div style={{ ...fontStyle, background: '#FAFAF9', minHeight: '100vh', padding: 20 }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
-        * { box-sizing: border-box; }
-        body { margin: 0; }
-      `}</style>
+    <div className="app-shell" style={fontStyle}>
+      <WorkspaceSidebar view={view} setView={setView} />
 
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 14, borderBottom: '0.5px solid #E7E5E4' }}>
+      <main className="workspace-main">
+        <header className="workspace-topbar">
           <div>
-            <div style={{ fontSize: 18, fontWeight: 500 }}>{data?.page?.name || 'Performance Analyzer'}{data?.demo && <span style={{ fontSize: 11, color: '#CA8A04', marginLeft: 8 }}>· DEMO DATA</span>}</div>
-            <div style={{ fontSize: 11, color: '#A8A29E', marginTop: 3 }}>
-              {data ? `${data.counts.total} posts · ${data.counts.boosted} boosted · ${data.counts.ads} pure ads · ${data.range.since} – ${data.range.until}` : 'กำลังเชื่อมต่อ backend...'}
-            </div>
+            <div className="workspace-context">Marketing workspace</div>
+            <div className="workspace-title">{view === 'report' ? 'Facebook Performance' : 'Data workspace'}</div>
           </div>
-          <div style={{ display: 'flex', gap: 3, padding: 3, background: '#F5F5F4', borderRadius: 6 }}>
-            {[{ id: 'combined', label: 'รวม' }, { id: 'organic', label: 'Organic' }, { id: 'paid', label: 'Paid' }].map(m => (
-              <button key={m.id} onClick={() => setMode(m.id)} style={{ fontSize: 11, padding: '5px 11px', borderRadius: 4, background: mode === m.id ? 'white' : 'transparent', color: mode === m.id ? '#1C1917' : '#78716C', fontWeight: mode === m.id ? 500 : 400, border: 'none', cursor: 'pointer', boxShadow: mode === m.id ? '0 0 0 0.5px #E7E5E4' : 'none' }}>{m.label}</button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 4, marginBottom: 18, fontSize: 12, alignItems: 'center' }}>
-          {tier !== 'overview' && (
-            <button onClick={() => setTier('overview')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#78716C', padding: '4px 0', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <ChevronLeft size={14} /> Back
-            </button>
-          )}
-          <button onClick={() => setTier('overview')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: tier === 'overview' ? '#1C1917' : '#A8A29E', fontWeight: tier === 'overview' ? 500 : 400, padding: '4px 8px' }}>1 · Overview</button>
-          <ChevronRight size={12} color="#D6D3D1" />
-          <button onClick={() => setTier('split')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: tier === 'split' ? '#1C1917' : '#A8A29E', fontWeight: tier === 'split' ? 500 : 400, padding: '4px 8px' }}>2 · Ads vs Organic</button>
-          <ChevronRight size={12} color="#D6D3D1" />
-          <button onClick={() => selectedPost && setTier('post')} disabled={!selectedPost} style={{ background: 'none', border: 'none', cursor: selectedPost ? 'pointer' : 'not-allowed', color: tier === 'post' ? '#1C1917' : '#A8A29E', fontWeight: tier === 'post' ? 500 : 400, padding: '4px 8px', opacity: selectedPost ? 1 : 0.5 }}>
-            3 · Post deep-dive {!selectedPost && '(เลือกโพสต์ก่อน)'}
+          <button className="data-health-button" onClick={() => setView('sources')}>
+            <span className={`health-indicator ${error ? 'error' : ''}`}></span>
+            {error ? 'Data source error' : data?.demo ? 'Demo source active' : 'Sources healthy'}
           </button>
-        </div>
+        </header>
 
-        {loading && <div style={{ padding: 40, textAlign: 'center', color: '#78716C', fontSize: 13 }}>กำลังโหลดข้อมูลจาก backend...</div>}
-        {error && (
-          <div style={{ padding: 24, background: '#FEE2E2', border: '0.5px solid #FECACA', borderRadius: 8, color: '#991B1B', fontSize: 13 }}>
-            เชื่อมต่อ backend ไม่ได้: {error}
-            <div style={{ fontSize: 11, color: '#B45309', marginTop: 6 }}>ตรวจว่ารัน <code>uvicorn server:app --port 8000</code> ใน fb_analyzer แล้ว</div>
-          </div>
-        )}
-        {data && !loading && (
-          <>
-            {tier === 'overview' && <TierOverview data={data} mode={mode} onSelectPost={handleSelect} />}
-            {tier === 'split' && <TierAdsOrganic data={data} />}
-            {tier === 'post' && selectedPost && <TierPostDetail post={selectedPost} baseline={data.baseline} />}
-          </>
-        )}
-      </div>
+        <div className="workspace-content">
+          {view === 'sources' ? (
+            <DataSourcesView data={data} loading={loading} error={error} onRefresh={() => setRefreshKey(key => key + 1)} />
+          ) : (
+            <section className="report-surface" aria-label="Facebook performance report">
+              <div className="report-header">
+                <div>
+                  <div className="report-title-line">
+                    <h1>{data?.page?.name || 'Performance Analyzer'}</h1>
+                    {data?.demo && <span className="demo-badge">Demo data</span>}
+                  </div>
+                  <p>
+                    {data ? `${data.counts.total} posts · ${data.counts.boosted} boosted · ${data.counts.ads} pure ads · ${data.range.since} – ${data.range.until}` : 'กำลังเชื่อมต่อ backend...'}
+                  </p>
+                </div>
+                <div className="mode-switch" aria-label="เลือกประเภทข้อมูล">
+                  {[{ id: 'combined', label: 'รวม' }, { id: 'organic', label: 'Organic' }, { id: 'paid', label: 'Paid' }].map(m => (
+                    <button key={m.id} className={mode === m.id ? 'active' : ''} onClick={() => setMode(m.id)}>{m.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              <nav className="tier-nav" aria-label="Report depth">
+                {tier !== 'overview' && (
+                  <button className="tier-back" onClick={() => setTier('overview')}><ChevronLeft size={14} /> กลับ</button>
+                )}
+                <button className={tier === 'overview' ? 'active' : ''} onClick={() => setTier('overview')}><span>1</span> Overview</button>
+                <ChevronRight className="tier-chevron" size={13} />
+                <button className={tier === 'split' ? 'active' : ''} onClick={() => setTier('split')}><span>2</span> Ads vs Organic</button>
+                <ChevronRight className="tier-chevron" size={13} />
+                <button className={tier === 'post' ? 'active' : ''} onClick={() => selectedPost && setTier('post')} disabled={!selectedPost}>
+                  <span>3</span> Post deep-dive {!selectedPost && <small>เลือกโพสต์ก่อน</small>}
+                </button>
+              </nav>
+
+              <div className="report-content">
+                {loading && <div className="loading-state"><RefreshCw size={18} /> กำลังโหลดข้อมูลจาก backend...</div>}
+                {error && (
+                  <div className="error-state">
+                    <AlertCircle size={18} />
+                    <div><strong>เชื่อมต่อ backend ไม่ได้</strong><span>{error} · ตรวจว่ารัน <code>uvicorn server:app --port 8000</code></span></div>
+                  </div>
+                )}
+                {data && !loading && (
+                  <>
+                    {tier === 'overview' && <TierOverview data={data} mode={mode} onSelectPost={handleSelect} />}
+                    {tier === 'split' && <TierAdsOrganic data={data} />}
+                    {tier === 'post' && selectedPost && <TierPostDetail post={selectedPost} baseline={data.baseline} />}
+                  </>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
