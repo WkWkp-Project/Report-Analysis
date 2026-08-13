@@ -9,6 +9,7 @@
 | `feature/backend-api-*` | REST API, validation และการประกอบ payload | `server.py`, `serializer.py` |
 | `feature/frontend-dashboard-*` | หน้าจอ React, interaction และ API adapter | `frontend/src/`, `frontend/vite.config.js` |
 | `feature/facebook-data-*` | Facebook Graph/Marketing API และ mapping ข้อมูล | `api_client.py` |
+| `feature/data-import-*` | import scope, canonical mapping, validation, lineage และ file/API ingestion | `import_pipeline/`, `DATA_IMPORT.md` |
 | `feature/scoring-analytics-*` | baseline, scoring, correlation, pattern และ schedule | `scoring.py`, `analyzer.py` |
 | `feature/ai-insights-*` | topic extraction และ narrative insight | `topic_extractor.py` |
 | `feature/streamlit-*` | Streamlit UI เดิม | `app.py` |

@@ -13,12 +13,16 @@ Endpoints
 
 import os
 from datetime import date, timedelta
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
+from import_pipeline.models import ImportStage, SourceKind
+from import_pipeline.registry import DIMENSIONS, METRICS
 from scoring import PostScorer, calculate_baseline
 from serializer import build_payload
 import topic_extractor
@@ -27,10 +31,16 @@ load_dotenv()
 
 app = FastAPI(title="FB Performance Analyzer API")
 
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # dev เท่านั้น — production ควรจำกัด origin
-    allow_methods=["GET"],
+    allow_origins=allowed_origins,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -85,6 +95,35 @@ def health():
     return {"status": "ok", "has_credentials": _has_credentials()}
 
 
+@app.get("/api/import/contracts")
+def import_contracts():
+    """Canonical contract used by future API/file import screens."""
+    return {
+        "schema_version": 1,
+        "stages": [stage.value for stage in ImportStage],
+        "source_kinds": [kind.value for kind in SourceKind],
+        "dimensions": [
+            {
+                "key": spec.key,
+                "label": spec.label,
+                "data_type": spec.data_type.value,
+                "required": spec.required_for_import,
+            }
+            for spec in DIMENSIONS.values()
+        ],
+        "metrics": [
+            {
+                "key": spec.key,
+                "label": spec.label,
+                "data_type": spec.data_type.value,
+                "aggregation": spec.aggregation.value,
+                "unit": spec.unit,
+            }
+            for spec in METRICS.values()
+        ],
+    }
+
+
 @app.get("/api/analyze")
 def analyze(
     since: str = Query(default=None),
@@ -114,3 +153,9 @@ def analyze(
         return payload
     except Exception as e:
         return JSONResponse(status_code=502, content={"error": str(e)})
+
+
+# Production serves the compiled React app from the same origin as the API.
+frontend_dist = Path(__file__).parent / "frontend" / "dist"
+if frontend_dist.is_dir():
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
