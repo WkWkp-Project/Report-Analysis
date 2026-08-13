@@ -58,6 +58,12 @@ spacing:
   xl: "20px"
   2xl: "28px"
 components:
+  button-primary:
+    backgroundColor: "{colors.primary-teal}"
+    textColor: "{colors.surface-white}"
+    rounded: "{rounded.md}"
+    padding: "9px 14px"
+    height: "40px"
   button-secondary:
     backgroundColor: "{colors.surface-white}"
     textColor: "{colors.text-muted}"
@@ -196,6 +202,7 @@ Shapes are gently technical: compact controls use `8–10px` corners, working ca
 ### Buttons
 
 - **Shape:** Gently rounded (`10px`) with a minimum height of `36px` for utility actions.
+- **Primary:** Evidence Teal background, white text, and a `40px` minimum height. Use it for the single action that advances a source workflow, such as opening provider authorization; disabled state becomes neutral gray rather than a faint teal imitation of readiness.
 - **Secondary:** Paper Surface background, Hairline Stone border, Measured Gray text, and compact `7px 11px` padding.
 - **Hover / Focus:** Hover darkens the border and text; keyboard focus uses a visible `3px` translucent teal outline with `2px` offset.
 - **Icon Action:** A square `34px` transparent control with a `9px` radius; hover adds a faint teal wash.
@@ -235,6 +242,14 @@ The three analysis tiers live in a bordered, horizontally scrollable path. The a
 
 The Source Ink band is the signature provenance component. It combines source identity, readiness, record count, and coverage in one compact status surface; teal communicates readiness and pale red communicates failure. Responsive reductions remove secondary statistics before removing source identity or health.
 
+### Connector Lifecycle Panel
+
+Provider connections use one Paper Surface panel for the complete lifecycle: provider identity and plain-language purpose first, a concise semantic state chip second, then setup proof or connected-resource evidence. Unconfigured state exposes only non-secret environment variable names; connected state exposes the account identity, resource counts, permission gaps, refresh, and disconnect actions without ever displaying credentials or tokens.
+
+The panel becomes a faint teal-tinted surface only after a valid connection. Permission gaps remain inside the connected panel as a compact amber warning because the source exists but its report coverage is incomplete. On narrow screens, setup controls and connected details stack while source identity, state, and the primary next action remain visible.
+
+**The Lifecycle Before Detail Rule.** A connector must make its current state and next valid action clear before presenting resource metadata or downstream import choices.
+
 ### Motion
 
 Report content settles over `380ms` with a short upward translation and blur release using `cubic-bezier(.16, 1, .3, 1)`. Ordinary state changes use `160ms ease-out`; loading uses a `900ms` linear spinner. Reduced-motion preference disables both report settling and spinner animation.
@@ -247,12 +262,14 @@ Report content settles over `380ms` with a short upward translation and blur rel
 - **Do** use teal sparingly for selected, ready, positive, or directional state.
 - **Do** preserve IBM Plex Mono for numbers, ranges, grades, and identifiers.
 - **Do** identify whether a metric comes from an API, file, manual input, or calculation.
+- **Do** keep provider identity, connection state, permission coverage, and the next valid action together in one connector lifecycle panel.
 - **Do** reduce secondary metadata before removing source identity, state, or analytical sequence on smaller screens.
 
 ### Don't:
 
 - **Don't** flatten the three-tier report into a single dense dashboard.
 - **Don't** blend uploaded-file metrics into API data without explicit source and mapping state.
+- **Don't** expose tokens, secrets, or credential-like values in connector UI; show only safe configuration keys and sanitized account metadata.
 - **Don't** use dark Source Ink panels as ordinary decorative cards.
 - **Don't** add accent colors unless they encode a distinct data category or semantic state.
 - **Don't** replace fine borders and controlled whitespace with heavy shadows or oversized card spacing.

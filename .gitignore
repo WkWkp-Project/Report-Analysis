@@ -1,6 +1,8 @@
-__pycache__/
-*.pyc
 .env
+__pycache__/
+*.py[cod]
 .local-logs/
 .impeccable/screenshots/
 data/
+frontend/dist/
+frontend/node_modules/

@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 
-BASE = "https://graph.facebook.com/v19.0"
+GRAPH_VERSION = os.getenv("FB_GRAPH_API_VERSION", "v25.0").lstrip("v")
+BASE = f"https://graph.facebook.com/v{GRAPH_VERSION}"
 
 
 class FBClient:
