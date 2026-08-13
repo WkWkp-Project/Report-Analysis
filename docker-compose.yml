@@ -1,0 +1,16 @@
+services:
+  report-analysis:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_DATA_DIR: /app/data
+      ALLOWED_ORIGINS: http://localhost:8000
+      FB_PAGE_ACCESS_TOKEN: ${FB_PAGE_ACCESS_TOKEN:-}
+      FB_PAGE_ID: ${FB_PAGE_ID:-}
+      FB_AD_ACCOUNT_ID: ${FB_AD_ACCOUNT_ID:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

@@ -1,0 +1,10 @@
+.git
+.env
+data
+frontend/node_modules
+frontend/dist
+__pycache__
+*.pyc
+*.log
+.local-logs
+.impeccable/screenshots

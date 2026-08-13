@@ -167,3 +167,22 @@ Claude จะอ่านโค้ด, แก้ไขไฟล์, รัน te
 ## การพัฒนาต่อ
 
 ดูขอบเขตและรูปแบบการตั้งชื่อ branch ใน [BRANCHING.md](BRANCHING.md) ก่อนเริ่มแก้ไข เพื่อแยกงาน backend, frontend, Facebook API, scoring และ AI insight ออกจากกันอย่างชัดเจน
+
+## Data import และ production
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — โครงสร้าง runtime, storage และแนวทาง deploy จากเครื่องเดียวไป managed production
+- [DATA_IMPORT.md](DATA_IMPORT.md) — workflow แบบ gated stages ตั้งแต่เลือกช่วงข้อมูลจนพร้อมให้ AI วิเคราะห์
+
+### Production แบบ container เดียว
+
+```bash
+docker compose up --build -d
+```
+
+เปิด `http://localhost:8000` โดย FastAPI จะ serve ทั้ง REST API และ React production build ส่วนข้อมูล runtime อยู่ใน `./data` ผ่าน persistent volume
+
+### Validation tests
+
+```bash
+python -m unittest discover -s tests -v
+```
