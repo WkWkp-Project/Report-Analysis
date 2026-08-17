@@ -165,6 +165,7 @@ Claude จะอ่านโค้ด, แก้ไขไฟล์, รัน te
 - [DATA_IMPORT.md](DATA_IMPORT.md) — workflow แบบ gated stages ตั้งแต่เลือกช่วงข้อมูลจนพร้อมให้ AI วิเคราะห์
 - [FACEBOOK_CONNECTION.md](FACEBOOK_CONNECTION.md) — ตั้งค่า Meta OAuth, การเก็บ token และ production callback
 - [CONNECTOR_ROADMAP.md](CONNECTOR_ROADMAP.md) — โครงหลายบัญชีและเส้นทางต่อ Google Ads/TikTok Ads
+- [REPORT_DELIVERY.md](REPORT_DELIVERY.md) — Export CSV/PDF และแนวทางลิงก์ลูกค้าแบบปลอดภัย
 
 สร้างข้อมูลตัวอย่างสำหรับหน้า Brand dashboard ใน development ได้ด้วย:
 
