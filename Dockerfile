@@ -15,7 +15,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt \
     && groupadd --gid 10001 report \
     && useradd --uid 10001 --gid report --no-create-home --shell /usr/sbin/nologin report
-COPY --chown=report:report server.py app_security.py facebook_connection.py ./
+COPY --chown=report:report server.py app_security.py facebook_connection.py portfolio.py ./
 COPY --chown=report:report api_client.py analyzer.py scoring.py serializer.py sample_data.py topic_extractor.py ./
 COPY --chown=report:report import_pipeline ./import_pipeline
 COPY --chown=report:report --from=frontend-build /build/frontend/dist /app/frontend/dist

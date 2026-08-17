@@ -158,6 +158,7 @@ Claude จะอ่านโค้ด, แก้ไขไฟล์, รัน te
 ## Data import และ production
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — โครงสร้าง runtime, storage และแนวทาง deploy จากเครื่องเดียวไป managed production
+- [PORTFOLIO.md](PORTFOLIO.md) — Workspace, Brand, Project และ Campaign reporting scope
 - [DATA_IMPORT.md](DATA_IMPORT.md) — workflow แบบ gated stages ตั้งแต่เลือกช่วงข้อมูลจนพร้อมให้ AI วิเคราะห์
 - [FACEBOOK_CONNECTION.md](FACEBOOK_CONNECTION.md) — ตั้งค่า Meta OAuth, การเก็บ token และ production callback
 

@@ -27,6 +27,14 @@ from pydantic import BaseModel, Field
 from app_security import RateLimiter, SecuritySettings, SessionManager, SESSION_COOKIE
 from import_pipeline.models import ImportStage, SourceKind
 from import_pipeline.registry import DIMENSIONS, METRICS
+from portfolio import (
+    BrandCreate,
+    CampaignCreate,
+    PortfolioError,
+    PortfolioStore,
+    ProjectCreate,
+    WorkspaceUpdate,
+)
 from scoring import PostScorer, calculate_baseline
 from serializer import build_payload
 import topic_extractor
@@ -37,6 +45,7 @@ logger = logging.getLogger(__name__)
 security_settings = SecuritySettings.from_environment()
 session_manager = SessionManager(security_settings)
 rate_limiter = RateLimiter()
+portfolio_store = PortfolioStore()
 
 app = FastAPI(
     title="FB Performance Analyzer API",
@@ -57,7 +66,7 @@ if app_base_url not in allowed_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
     allow_credentials=True,
 )
@@ -254,6 +263,53 @@ def import_contracts(request: Request):
             for spec in METRICS.values()
         ],
     }
+
+
+@app.get("/api/portfolio")
+def portfolio_snapshot(request: Request):
+    """Return the one-workspace portfolio registry used to scope reports and imports."""
+    _require_authenticated(request)
+    try:
+        return portfolio_store.snapshot().model_dump(mode="json")
+    except PortfolioError as exc:
+        raise HTTPException(status_code=500, detail="อ่าน portfolio registry ไม่สำเร็จ") from exc
+
+
+@app.patch("/api/portfolio/workspace")
+def portfolio_update_workspace(payload: WorkspaceUpdate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="portfolio_write", limit=60, window_seconds=60)
+    return portfolio_store.update_workspace(payload).model_dump(mode="json")
+
+
+@app.post("/api/portfolio/brands", status_code=201)
+def portfolio_create_brand(payload: BrandCreate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="portfolio_write", limit=60, window_seconds=60)
+    try:
+        return portfolio_store.create_brand(payload).model_dump(mode="json")
+    except PortfolioError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/portfolio/projects", status_code=201)
+def portfolio_create_project(payload: ProjectCreate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="portfolio_write", limit=60, window_seconds=60)
+    try:
+        return portfolio_store.create_project(payload).model_dump(mode="json")
+    except PortfolioError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/portfolio/campaigns", status_code=201)
+def portfolio_create_campaign(payload: CampaignCreate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="portfolio_write", limit=60, window_seconds=60)
+    try:
+        return portfolio_store.create_campaign(payload).model_dump(mode="json")
+    except PortfolioError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get("/api/facebook/status")

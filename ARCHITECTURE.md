@@ -17,6 +17,7 @@ FastAPI service
           ├── staged/      ข้อมูลที่ normalize แล้วแต่ยังไม่ยืนยัน
           ├── confirmed/   dataset ที่ผ่าน quality gates
           ├── media/       รูป/metadata ของ content พร้อม checksum
+          ├── portfolio/   workspace, brand, project และ campaign registry
           └── manifests/   scope, mapping, lineage และผล validation
 ```
 
@@ -45,6 +46,7 @@ Development ยังคงแยก Vite `:5173` และ FastAPI `:8000` เ�
 ## Service boundaries
 
 - `api_client.py` — connector เฉพาะ Facebook เท่านั้น
+- `portfolio.py` — Level 1 registry ของ Workspace, Brand, Project และ external Campaign binding
 - `import_pipeline/` — canonical schema, mapping, granularity และ quality gates
 - `data/` — runtime state; ไม่ commit เข้า Git
 - `scoring.py`, `analyzer.py` — รับเฉพาะ confirmed canonical records
@@ -70,3 +72,9 @@ Development ยังคงแยก Vite `:5173` และ FastAPI `:8000` เ�
 ต้องมีทั้งสองส่วนเมื่อต้อง restore เครื่องใหม่ การลบ container หรือ rebuild image ไม่ลบ named volume แต่ `docker compose down -v` จะลบข้อมูล จึงห้ามใช้คำสั่งนี้กับระบบจริงโดยไม่มี backup
 
 Streamlit (`app.py`) ไม่ถูก copy เข้า production image และไม่อยู่หลัง authentication middleware ใช้ได้เฉพาะการทดลอง local เท่านั้น
+
+### Portfolio security boundary
+
+Level 1 มีหนึ่ง authenticated workspace แต่รองรับหลาย Brand, Project และ Campaign ข้อมูล portfolio ไม่รับ `workspace_id` จาก request จึงไม่มีช่องให้เปลี่ยน scope ข้าม workspace ผ่าน URL ทุก mutation ผ่าน signed session, origin validation, rate limit และเขียน `catalog.json` แบบ atomic ด้วย permission `0600`
+
+หากอนาคตเปิดหลายบริษัทหรือหลายกลุ่มผู้ใช้ ต้องเพิ่ม user/workspace membership และ authorization ก่อน ไม่ใช้ workspace password เดียวครอบทุก tenant
