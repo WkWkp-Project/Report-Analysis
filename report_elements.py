@@ -14,7 +14,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-PROJECT_ID_PATTERN = re.compile(r"^prj_[a-f0-9]{16}$")
+PROJECT_ID_PATTERN = re.compile(r"^(?:prj|rpt)_[a-f0-9]{16}$")
 REPORT_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 
 

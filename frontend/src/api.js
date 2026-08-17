@@ -12,7 +12,7 @@ async function responseError(res) {
   return error;
 }
 
-export async function fetchAnalysis({ since, until, demo, projectId, periodId, campaignIds = [] } = {}) {
+export async function fetchAnalysis({ since, until, demo, projectId, periodId, campaignIds = [], reportId } = {}) {
   const params = new URLSearchParams();
   if (since) params.set('since', since);
   if (until) params.set('until', until);
@@ -20,6 +20,7 @@ export async function fetchAnalysis({ since, until, demo, projectId, periodId, c
   if (projectId) params.set('project_id', projectId);
   if (periodId) params.set('period_id', periodId);
   campaignIds.forEach(campaignId => params.append('campaign_ids', campaignId));
+  if (reportId) params.set('report_id', reportId);
   const qs = params.toString();
   const res = await fetch(`/api/analyze${qs ? `?${qs}` : ''}`, { credentials: 'same-origin' });
   if (!res.ok) throw await responseError(res);
@@ -68,6 +69,33 @@ export function disconnectFacebook() {
 
 export function fetchPortfolio() {
   return requestJson('/api/portfolio');
+}
+
+export function fetchReports(brandId, includeArchived = false) {
+  const params = new URLSearchParams();
+  if (brandId) params.set('brand_id', brandId);
+  if (includeArchived) params.set('include_archived', 'true');
+  return requestJson(`/api/reports?${params}`);
+}
+
+export function fetchReport(reportId) {
+  return requestJson(`/api/reports/${encodeURIComponent(reportId)}`);
+}
+
+export function createSavedReport(payload) {
+  return requestJson('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
+export function updateSavedReport(reportId, payload) {
+  return requestJson(`/api/reports/${encodeURIComponent(reportId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
+export function publishSavedReport(reportId, note = null) {
+  return requestJson(`/api/reports/${encodeURIComponent(reportId)}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ demo: true, note }) });
+}
+
+export function archiveSavedReport(reportId) {
+  return requestJson(`/api/reports/${encodeURIComponent(reportId)}`, { method: 'DELETE' });
 }
 
 export function createBrand(payload) {

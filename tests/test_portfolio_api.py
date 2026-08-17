@@ -10,6 +10,7 @@ from portfolio import PortfolioStore
 from report_elements import ReportElementStore
 from metric_workspace import MetricWorkspaceStore
 from report_shares import ReportShareStore
+from report_library import ReportLibraryStore
 
 
 class PortfolioApiSecurityTests(unittest.TestCase):
@@ -22,6 +23,7 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         self.original_element_store = server.report_element_store
         self.original_metric_store = server.metric_workspace_store
         self.original_share_store = server.report_share_store
+        self.original_library_store = server.report_library_store
         settings = SecuritySettings(
             environment="production",
             password="portfolio-test-password",
@@ -34,6 +36,7 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         server.report_element_store = ReportElementStore(Path(self.directory.name))
         server.metric_workspace_store = MetricWorkspaceStore(Path(self.directory.name))
         server.report_share_store = ReportShareStore(Path(self.directory.name))
+        server.report_library_store = ReportLibraryStore(Path(self.directory.name))
         self.client = TestClient(server.app)
 
     def tearDown(self):
@@ -45,6 +48,7 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         server.report_element_store = self.original_element_store
         server.metric_workspace_store = self.original_metric_store
         server.report_share_store = self.original_share_store
+        server.report_library_store = self.original_library_store
         self.directory.cleanup()
 
     def login(self):
@@ -224,6 +228,25 @@ class PortfolioApiSecurityTests(unittest.TestCase):
             json={"period_id": period["id"], "campaign_id": campaign["id"], "values": {"revenue": 1}, "reason": "blocked"},
         )
         self.assertEqual(blocked.status_code, 401)
+
+    def test_brand_first_report_publish_keeps_revision(self):
+        self.login()
+        brand_id, _ = self.create_project()
+        created = self.client.post("/api/reports", json={"brand_id": brand_id, "name": "August client report", "date_from": "2026-08-01", "date_to": "2026-08-31"})
+        self.assertEqual(created.status_code, 201)
+        report_id = created.json()["id"]
+        analysis = self.client.get(f"/api/analyze?demo=1&report_id={report_id}")
+        self.assertEqual(analysis.status_code, 200)
+        self.assertEqual(analysis.json()["report"]["brand_id"], brand_id)
+        published = self.client.post(f"/api/reports/{report_id}/publish", json={"demo": True, "note": "approved"})
+        self.assertEqual(published.status_code, 200)
+        self.assertEqual(published.json()["revision"]["version"], 1)
+        detail = self.client.get(f"/api/reports/{report_id}").json()
+        self.assertEqual(detail["report"]["status"], "published")
+        self.assertTrue(detail["revisions"][0]["snapshot"]["read_only"])
+        archived = self.client.delete(f"/api/reports/{report_id}")
+        self.assertEqual(archived.status_code, 200)
+        self.assertEqual(archived.json()["status"], "archived")
 
 
 if __name__ == "__main__":

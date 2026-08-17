@@ -50,6 +50,13 @@ from metric_workspace import (
     MetricWorkspaceStore,
 )
 from report_shares import ReportShareError, ReportShareStore
+from report_library import (
+    ReportCreate,
+    ReportLibraryError,
+    ReportLibraryStore,
+    ReportPublish,
+    ReportUpdate,
+)
 from scoring import PostScorer, calculate_baseline
 from serializer import build_payload
 import topic_extractor
@@ -64,6 +71,7 @@ portfolio_store = PortfolioStore()
 report_element_store = ReportElementStore()
 metric_workspace_store = MetricWorkspaceStore()
 report_share_store = ReportShareStore()
+report_library_store = ReportLibraryStore()
 
 app = FastAPI(
     title="FB Performance Analyzer API",
@@ -179,6 +187,50 @@ def _require_project(project_id: str) -> None:
         raise HTTPException(status_code=500, detail="อ่าน portfolio registry ไม่สำเร็จ") from exc
     if not any(project.id == project_id for project in projects):
         raise HTTPException(status_code=404, detail="ไม่พบโปรเจกต์ที่เลือก")
+
+
+def _require_element_owner(owner_id: str) -> None:
+    if owner_id.startswith("rpt_"):
+        try:
+            report_library_store.get(owner_id)
+            return
+        except ReportLibraryError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    _require_project(owner_id)
+
+
+def _validate_report_scope(payload: ReportCreate | ReportUpdate, existing: dict | None = None) -> None:
+    snapshot = portfolio_store.snapshot()
+    values = {**(existing or {}), **payload.model_dump(exclude_unset=True, mode="json")}
+    brand_id = values.get("brand_id")
+    if not any(brand.id == brand_id for brand in snapshot.brands):
+        raise HTTPException(status_code=404, detail="ไม่พบแบรนด์ที่เลือก")
+    project_id = values.get("project_id")
+    campaign_ids = values.get("campaign_ids") or []
+    if not project_id:
+        return
+    project = next((item for item in snapshot.projects if item.id == project_id), None)
+    if project is None or brand_id not in project.brand_ids:
+        raise HTTPException(status_code=422, detail="Project ไม่ได้อยู่ในแบรนด์ที่เลือก")
+    matched = [item for item in snapshot.campaigns if item.id in campaign_ids and item.project_id == project_id and brand_id in item.brand_ids]
+    if len(matched) != len(campaign_ids):
+        raise HTTPException(status_code=422, detail="Campaign scope ไม่ตรงกับ Brand/Project")
+
+
+def _library_analysis_scope(report: dict) -> dict | None:
+    if not report.get("project_id") or not report.get("campaign_ids"):
+        return None
+    snapshot = portfolio_store.snapshot()
+    project = next(item for item in snapshot.projects if item.id == report["project_id"])
+    campaigns = [item for item in snapshot.campaigns if item.id in report["campaign_ids"]]
+    return {
+        "project_id": project.id,
+        "project_name": project.name,
+        "period_id": report["id"],
+        "period_label": report["name"],
+        "brand_id": report["brand_id"],
+        "campaigns": [{"id": item.id, "name": item.name, "source": item.source, "source_account_id": item.source_account_id, "source_campaign_id": item.source_campaign_id} for item in campaigns],
+    }
 
 
 def _resolve_analysis_scope(
@@ -539,6 +591,73 @@ def portfolio_create_campaign(payload: CampaignCreate, request: Request):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@app.get("/api/reports")
+def report_library_list(request: Request, brand_id: str | None = Query(default=None, max_length=80), include_archived: bool = False):
+    _require_authenticated(request)
+    try:
+        return report_library_store.list({brand_id} if brand_id else None, include_archived)
+    except ReportLibraryError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/api/reports", status_code=201)
+def report_library_create(payload: ReportCreate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="report_library_write", limit=60, window_seconds=60)
+    _validate_report_scope(payload)
+    try:
+        return report_library_store.create(payload)
+    except ReportLibraryError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/reports/{report_id}")
+def report_library_detail(report_id: str, request: Request):
+    _require_authenticated(request)
+    try:
+        return report_library_store.get(report_id)
+    except ReportLibraryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.patch("/api/reports/{report_id}")
+def report_library_update(report_id: str, payload: ReportUpdate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="report_library_write", limit=60, window_seconds=60)
+    try:
+        current = report_library_store.get(report_id)["report"]
+        _validate_report_scope(payload, current)
+        return report_library_store.update(report_id, payload)
+    except ReportLibraryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.delete("/api/reports/{report_id}")
+def report_library_archive(report_id: str, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="report_library_write", limit=60, window_seconds=60)
+    try:
+        return report_library_store.archive(report_id)
+    except ReportLibraryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/reports/{report_id}/publish")
+def report_library_publish(report_id: str, payload: ReportPublish, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="report_publish", limit=20, window_seconds=60)
+    try:
+        report = report_library_store.get(report_id)["report"]
+        _validate_report_scope(ReportUpdate(), report)
+        if not payload.demo:
+            raise HTTPException(status_code=501, detail="ข้อมูลจริงต้องผ่าน import validation ก่อน Publish")
+        analysis = _demo_payload(date.fromisoformat(report["date_from"]), date.fromisoformat(report["date_to"]), _library_analysis_scope(report))
+        analysis["report"] = {key: report[key] for key in ("id", "brand_id", "name", "date_from", "date_to")}
+        return report_library_store.publish(report_id, _public_snapshot(analysis), payload.note)
+    except ReportLibraryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.get("/api/projects/{project_id}/elements")
 def report_element_list(
     project_id: str,
@@ -546,7 +665,7 @@ def report_element_list(
     report_key: str = Query(default="working", min_length=1, max_length=80),
 ):
     _require_authenticated(request)
-    _require_project(project_id)
+    _require_element_owner(project_id)
     try:
         return {
             "project_id": project_id,
@@ -565,7 +684,7 @@ def report_element_create(
     project_id: str, payload: ReportElementCreate, request: Request
 ):
     _require_authenticated(request)
-    _require_project(project_id)
+    _require_element_owner(project_id)
     _enforce_rate_limit(request, action="report_element_write", limit=120, window_seconds=60)
     try:
         return report_element_store.create(project_id, payload).model_dump(mode="json")
@@ -581,7 +700,7 @@ def report_element_update(
     request: Request,
 ):
     _require_authenticated(request)
-    _require_project(project_id)
+    _require_element_owner(project_id)
     _enforce_rate_limit(request, action="report_element_write", limit=120, window_seconds=60)
     try:
         return report_element_store.update(project_id, element_id, payload).model_dump(
@@ -594,7 +713,7 @@ def report_element_update(
 @app.delete("/api/projects/{project_id}/elements/{element_id}")
 def report_element_delete(project_id: str, element_id: str, request: Request):
     _require_authenticated(request)
-    _require_project(project_id)
+    _require_element_owner(project_id)
     _enforce_rate_limit(request, action="report_element_write", limit=120, window_seconds=60)
     try:
         deleted = report_element_store.delete(project_id, element_id)
@@ -697,7 +816,15 @@ def facebook_disconnect(request: Request):
 def update_campaign_metrics(project_id: str, payload: MetricOverrideUpsert, request: Request):
     _require_authenticated(request)
     _enforce_rate_limit(request, action="metric_override", limit=60, window_seconds=60)
-    _resolve_analysis_scope(project_id, payload.period_id, [payload.campaign_id])
+    if payload.period_id.startswith("rpt_"):
+        try:
+            report = report_library_store.get(payload.period_id)["report"]
+        except ReportLibraryError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if report.get("project_id") != project_id or payload.campaign_id not in report.get("campaign_ids", []):
+            raise HTTPException(status_code=422, detail="Campaign ไม่ได้อยู่ในรายงานนี้")
+    else:
+        _resolve_analysis_scope(project_id, payload.period_id, [payload.campaign_id])
     try:
         return metric_workspace_store.upsert_override(project_id, payload)
     except MetricWorkspaceError as exc:
@@ -754,21 +881,31 @@ def analyze(
     project_id: str | None = Query(default=None, max_length=80),
     period_id: str | None = Query(default=None, max_length=80),
     campaign_ids: list[str] | None = Query(default=None),
+    report_id: str | None = Query(default=None, max_length=80),
 ):
     _require_authenticated(request)
     _enforce_rate_limit(request, action="analyze", limit=30, window_seconds=60)
-    until_date = until or date.today()
-    since_date = since or (until_date - timedelta(days=89))
+    saved_report = None
+    if report_id:
+        try:
+            saved_report = report_library_store.get(report_id)["report"]
+        except ReportLibraryError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    until_date = date.fromisoformat(saved_report["date_to"]) if saved_report else (until or date.today())
+    since_date = date.fromisoformat(saved_report["date_from"]) if saved_report else (since or (until_date - timedelta(days=89)))
     if since_date > until_date:
         raise HTTPException(status_code=422, detail="วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด")
     since_value = str(since_date)
     until_value = str(until_date)
-    analysis_scope = _resolve_analysis_scope(project_id, period_id, campaign_ids or [])
+    analysis_scope = _library_analysis_scope(saved_report) if saved_report else _resolve_analysis_scope(project_id, period_id, campaign_ids or [])
 
     use_demo = bool(demo) or not _has_credentials()
 
     if use_demo:
-        return _demo_payload(since_date, until_date, analysis_scope)
+        payload = _demo_payload(since_date, until_date, analysis_scope)
+        if saved_report:
+            payload["report"] = {key: saved_report[key] for key in ("id", "brand_id", "name", "date_from", "date_to", "status", "current_revision")}
+        return payload
 
     if analysis_scope:
         raise HTTPException(

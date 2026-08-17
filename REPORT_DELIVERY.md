@@ -2,6 +2,8 @@
 
 ## Available now
 
+- **Report library** stores reports under a Brand with a name and Period. Project/Campaign scope is optional. Submit/Publish creates numbered immutable revisions, while working changes remain a Draft.
+- **Revision history** opens old published snapshots without recalculating or overwriting them; Archive is a soft delete.
 - **Internal report link** stores only report scope in the URL: date range, Project, Period, and Campaign IDs. It never contains access tokens or credentials. Workspace users must authenticate before the API returns editable data.
 - **Client report link** creates an immutable, read-only snapshot with a random capability token and a 30-day default expiry. The stored record contains only the SHA-256 hash of the token, not the usable token itself. The public payload removes provider account/campaign IDs, credentials, internal override notes, and editing controls.
 - **CSV export** downloads the posts in the current Combined / Organic / Paid view with UTF-8 Thai support, exact values, Project and Period context, and spreadsheet-formula neutralization.

@@ -1,5 +1,15 @@
 # Portfolio and report scope
 
+## Brand-first report library
+
+การใช้งานประจำวันเริ่มที่ `Brand → Report → Period → Revision` รายงานต้องมีเพียง Brand, ชื่อ และช่วงวันที่ ส่วน Project และ Campaign เป็น filter เสริม ไม่ใช่ prerequisite
+
+- Draft แก้ชื่อ ช่วงเวลา ตัวเลข สูตร และ Working notes ได้
+- Submit/Publish สร้าง immutable snapshot เป็น Revision ใหม่ ไม่เขียนทับฉบับก่อน
+- Published report เปิดดูย้อนหลังได้ทุก Revision
+- Delete ใน UI เป็น Archive แบบกู้คืนข้อมูลได้
+- Project/Campaign registry เดิมยังใช้กับการผูก data source และการกรองข้อมูลแบบละเอียด
+
 ## Level 1 hierarchy
 
 ```text

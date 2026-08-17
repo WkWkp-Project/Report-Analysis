@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle, LockKeyhole, LogOut, FolderKanban, Plus, MessageSquareText, ListChecks, Lightbulb, TextQuote, Pencil, Trash2, Save, Check, ArrowLeft, ArrowRight, CalendarRange, Cable, Download, Share2, Printer, Table2, Sigma, Eye } from 'lucide-react';
-import { createBrand, createCampaign, createCustomMetric, createPeriod, createProject, createReportElement, createReportShare, deleteReportElement, disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, fetchPortfolio, fetchPublicReport, fetchReportElements, login, logout, refreshFacebookConnection, startFacebookConnection, updateCampaignMetrics, updateReportElement } from './api.js';
+import { archiveSavedReport, createBrand, createCampaign, createCustomMetric, createPeriod, createProject, createReportElement, createReportShare, createSavedReport, deleteReportElement, disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, fetchPortfolio, fetchPublicReport, fetchReport, fetchReportElements, fetchReports, login, logout, publishSavedReport, refreshFacebookConnection, startFacebookConnection, updateCampaignMetrics, updateReportElement, updateSavedReport } from './api.js';
 import './styles.css';
 
 // ============ FORMATTERS ============
@@ -854,12 +854,12 @@ function buildRecommendations(p, er) {
 
 const WorkspaceSidebar = ({ view, setView, onLogout, canLogout }) => {
   const items = [
+    { id: 'reports', label: 'Report library', icon: Layers3 },
     { id: 'report', label: 'Facebook Performance', icon: BarChart3 },
     { id: 'portfolio', label: 'Brands & projects', icon: FolderKanban },
     { id: 'sources', label: 'Data sources', icon: Database },
   ];
   const planned = [
-    { label: 'Saved reports', icon: Layers3 },
     { label: 'Metric library', icon: FileSpreadsheet },
   ];
 
@@ -1082,6 +1082,81 @@ const DataSourcesView = ({ loading, onRefresh, facebook, facebookNotice, onFaceb
       </div>
     </section>
   );
+};
+
+const ReportLibraryView = ({ portfolio, onOpenDraft, onOpenRevision, onSessionExpiry }) => {
+  const brands = portfolio.data?.brands || [];
+  const projects = portfolio.data?.projects || [];
+  const campaigns = portfolio.data?.campaigns || [];
+  const [brandId, setBrandId] = useState(brands[0]?.id || '');
+  const [state, setState] = useState({ loading: true, error: null, reports: [] });
+  const [creating, setCreating] = useState(false);
+  const [history, setHistory] = useState({});
+  const initialDates = defaultPeriod();
+  const [form, setForm] = useState({ name: '', date_from: initialDates.since, date_to: initialDates.until, project_id: '', campaign_ids: [] });
+  const selectedProjects = projects.filter(project => project.brand_ids.includes(brandId) && project.status === 'active');
+  const selectedCampaigns = campaigns.filter(campaign => campaign.project_id === form.project_id && campaign.brand_ids.includes(brandId));
+
+  const load = () => {
+    if (!brandId) return setState({ loading: false, error: null, reports: [] });
+    setState(current => ({ ...current, loading: true, error: null }));
+    fetchReports(brandId).then(result => setState({ loading: false, error: null, reports: result.reports })).catch(err => {
+      if (!onSessionExpiry?.(err)) setState({ loading: false, error: err.message, reports: [] });
+    });
+  };
+  useEffect(load, [brandId]);
+  useEffect(() => { if (!brandId && brands[0]) setBrandId(brands[0].id); }, [brands.length]);
+
+  const submit = async event => {
+    event.preventDefault();
+    setCreating(true);
+    try {
+      const report = await createSavedReport({ brand_id: brandId, name: form.name, date_from: form.date_from, date_to: form.date_to, project_id: form.project_id || null, campaign_ids: form.project_id ? form.campaign_ids : [] });
+      setForm({ name: '', date_from: form.date_from, date_to: form.date_to, project_id: '', campaign_ids: [] });
+      await load();
+      onOpenDraft(report);
+    } catch (err) {
+      if (!onSessionExpiry?.(err)) setState(current => ({ ...current, error: err.message }));
+    } finally { setCreating(false); }
+  };
+  const openLatest = async report => {
+    if (!report.current_revision) return onOpenDraft(report);
+    try {
+      const detail = await fetchReport(report.id);
+      onOpenRevision(report, detail.revisions[0]);
+    } catch (err) { if (!onSessionExpiry?.(err)) setState(current => ({ ...current, error: err.message })); }
+  };
+  const toggleHistory = async report => {
+    if (history[report.id]) return setHistory(current => ({ ...current, [report.id]: null }));
+    try {
+      const detail = await fetchReport(report.id);
+      setHistory(current => ({ ...current, [report.id]: detail.revisions }));
+    } catch (err) { if (!onSessionExpiry?.(err)) setState(current => ({ ...current, error: err.message })); }
+  };
+  const archive = async report => {
+    if (!window.confirm(`เก็บ “${report.name}” เข้า Archive? Revision ที่ Publish แล้วจะไม่ถูกลบถาวร`)) return;
+    try { await archiveSavedReport(report.id); await load(); }
+    catch (err) { if (!onSessionExpiry?.(err)) setState(current => ({ ...current, error: err.message })); }
+  };
+
+  return <section className="report-library" aria-labelledby="report-library-title">
+    <header className="library-hero"><div><div className="section-kicker">Brand-first workspace</div><h1 id="report-library-title">กล่องรายงาน</h1><p>รายงานทุกชิ้นมี Draft, Period และ Revision ของตัวเอง จึงไม่ทับข้อมูลเดือนก่อน</p></div><button className="primary-action" type="button" onClick={() => document.getElementById('new-report-form')?.scrollIntoView({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })}><Plus size={15} /> สร้างรายงาน</button></header>
+    <div className="brand-report-strip" aria-label="เลือกแบรนด์">{brands.map(brand => <button type="button" className={brandId === brand.id ? 'active' : ''} key={brand.id} onClick={() => setBrandId(brand.id)}><span>{brand.code || brand.name.slice(0, 2)}</span><strong>{brand.name}</strong><small>{state.reports.filter(report => report.brand_id === brand.id).length || 'ดู'} reports</small></button>)}</div>
+    <div className="library-layout">
+      <div className="report-ledger">
+        <div className="ledger-head"><span>ชื่อรายงาน</span><span>Period</span><span>สถานะ</span><span>Revision</span><span>จัดการ</span></div>
+        {state.loading ? <div className="loading-state"><LoaderCircle className="button-spinner" size={17} /> กำลังเปิดกล่องรายงาน...</div> : state.reports.length ? state.reports.map(report => <React.Fragment key={report.id}><div className="ledger-row">
+          <div><strong>{report.name}</strong><small>{report.project_id ? 'มี Project/Campaign filter' : 'Brand + Period'}</small></div>
+          <div><strong>{new Date(report.date_from).toLocaleDateString('th-TH')} – {new Date(report.date_to).toLocaleDateString('th-TH')}</strong><small>อัปเดต {new Date(report.updated_at).toLocaleDateString('th-TH')}</small></div>
+          <div><span className={`report-status ${report.status}`}>{report.status === 'published' ? 'Published' : 'Draft'}</span></div>
+          <div><strong>{report.current_revision ? `v${report.current_revision}` : '—'}</strong><small>{report.current_revision ? 'เก็บ snapshot แล้ว' : 'ยังไม่ Submit'}</small></div>
+          <div className="ledger-actions"><button type="button" onClick={() => onOpenDraft(report)}><Pencil size={14} /> ทำงานต่อ</button>{report.current_revision > 0 && <button type="button" onClick={() => toggleHistory(report)}><Eye size={14} /> Versions</button>}<button className="archive" type="button" onClick={() => archive(report)}><Trash2 size={14} /></button></div>
+        </div>{history[report.id] && <div className="revision-drawer"><strong>Revision history</strong><div>{history[report.id].map(revision => <button type="button" key={revision.id} onClick={() => onOpenRevision(report, revision)}><span>v{revision.version}</span><b>{new Date(revision.created_at).toLocaleString('th-TH')}</b><small>{revision.note || 'Published snapshot'}</small></button>)}</div></div>}</React.Fragment>) : <div className="portfolio-empty"><Layers3 size={24} /><strong>แบรนด์นี้ยังไม่มีรายงาน</strong><span>ตั้งชื่อและเลือก Period ได้ทันที โดยไม่ต้องสร้าง Project หรือ Campaign</span></div>}
+        {state.error && <div className="inline-error" role="alert"><AlertCircle size={14} /> {state.error}</div>}
+      </div>
+      <form id="new-report-form" className="new-report-card" onSubmit={submit}><div><div className="section-kicker">New draft</div><h2>สร้างรายงานใหม่</h2><p>Project และ Campaign เป็นตัวเลือกเสริม</p></div><label>ชื่อรายงาน<input required maxLength="160" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} placeholder="เช่น Monthly Performance · สิงหาคม" /></label><div className="portfolio-date-pair"><label>ตั้งแต่<input required type="date" value={form.date_from} max={form.date_to} onChange={event => setForm({ ...form, date_from: event.target.value })} /></label><label>ถึง<input required type="date" value={form.date_to} min={form.date_from} onChange={event => setForm({ ...form, date_to: event.target.value })} /></label></div><label>Project filter <small>ไม่บังคับ</small><select value={form.project_id} onChange={event => setForm({ ...form, project_id: event.target.value, campaign_ids: [] })}><option value="">ไม่ใช้ Project</option>{selectedProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{form.project_id && <fieldset><legend>Campaign ที่ Include <small>เลือกได้หลายรายการ</small></legend>{selectedCampaigns.map(campaign => <label className="campaign-check" key={campaign.id}><input type="checkbox" checked={form.campaign_ids.includes(campaign.id)} onChange={() => setForm(current => ({ ...current, campaign_ids: current.campaign_ids.includes(campaign.id) ? current.campaign_ids.filter(id => id !== campaign.id) : [...current.campaign_ids, campaign.id] }))} />{campaign.name}</label>)}</fieldset>}<button className="primary-action" type="submit" disabled={creating || !brandId}>{creating ? <LoaderCircle className="button-spinner" size={15} /> : <Plus size={15} />} สร้าง Draft และเปิด</button></form>
+    </div>
+  </section>;
 };
 
 const PortfolioView = ({ portfolio, selectedProjectId, navigateRequest, onNavigationComplete, onSelectProject, onPortfolioChange, onSessionExpiry, onOpenReport }) => {
@@ -1316,6 +1391,7 @@ const ELEMENT_KINDS = {
 };
 
 const ReportElementsPanel = ({ project, onOpenPortfolio, onSessionExpiry }) => {
+  const isSavedReport = project?.id?.startsWith('rpt_');
   const [state, setState] = useState({ loading: false, error: null, elements: [] });
   const [form, setForm] = useState({ kind: 'comment', title: '', content: '' });
   const [saving, setSaving] = useState(false);
@@ -1356,7 +1432,7 @@ const ReportElementsPanel = ({ project, onOpenPortfolio, onSessionExpiry }) => {
   };
 
   return <section id="report-elements" className="report-elements" aria-labelledby="report-elements-title">
-    <div className="elements-heading"><div><div className="section-kicker">Project workspace</div><h2 id="report-elements-title">Working notes</h2><p>เพิ่มบริบทที่ตัวเลขบอกไม่ได้ และเก็บ Next step ไว้กับ Project นี้โดยตรง</p></div>{project && <span className="project-context-chip">{project.name}</span>}</div>
+    <div className="elements-heading"><div><div className="section-kicker">{isSavedReport ? 'Report workspace' : 'Project workspace'}</div><h2 id="report-elements-title">Working notes</h2><p>เพิ่มบริบทที่ตัวเลขบอกไม่ได้ และเก็บ Next step ไว้กับ{isSavedReport ? 'รายงาน' : ' Project'}นี้โดยตรง</p></div>{project && <span className="project-context-chip">{project.name}</span>}</div>
     {!project ? <div className="elements-locked"><FolderKanban size={21} /><div><strong>เลือก Project ก่อนเพิ่มข้อความ</strong><span>การบังคับ scope ช่วยป้องกันโน้ตของหลายแบรนด์ปะปนกัน</span></div><button className="secondary-action" type="button" onClick={onOpenPortfolio}>ตั้งค่า Project</button></div> : <>
       <form className="element-composer" onSubmit={submit}>
         <div className="kind-selector" role="radiogroup" aria-label="ชนิดข้อความ">{Object.entries(ELEMENT_KINDS).map(([id, config]) => { const Icon = config.icon; return <button key={id} type="button" role="radio" aria-checked={form.kind === id} className={form.kind === id ? 'active' : ''} onClick={() => setForm({ ...form, kind: id })}><Icon size={15} />{config.label}</button>; })}</div>
@@ -1459,7 +1535,7 @@ const PublicReportView = ({ token }) => {
 export default function Dashboard() {
   const [shareToken] = useState(shareTokenFromLocation);
   const [initialReport] = useState(reportStateFromLocation);
-  const [view, setView] = useState(initialReport ? 'report' : 'portfolio');
+  const [view, setView] = useState(initialReport ? 'report' : 'reports');
   const [refreshKey, setRefreshKey] = useState(0);
   const [tier, setTier] = useState('overview');
   const [selectedPost, setSelectedPost] = useState(null);
@@ -1467,6 +1543,8 @@ export default function Dashboard() {
   const [periodDraft, setPeriodDraft] = useState(() => initialReport || defaultPeriod());
   const [periodApplied, setPeriodApplied] = useState(() => initialReport || defaultPeriod());
   const [state, setState] = useState({ loading: true, error: null, data: null });
+  const [activeSavedReport, setActiveSavedReport] = useState(null);
+  const [previewSnapshot, setPreviewSnapshot] = useState(null);
   const [portfolio, setPortfolio] = useState({ loading: true, error: null, data: null });
   const [selectedProjectId, setSelectedProjectId] = useState(initialReport?.projectId || null);
   const [reportSourceMode] = useState('demo');
@@ -1584,6 +1662,8 @@ export default function Dashboard() {
     setRefreshKey(key => key + 1);
   };
   const handleOpenReportPeriod = nextPeriod => {
+    setActiveSavedReport(null);
+    setPreviewSnapshot(null);
     setPeriodDraft(nextPeriod);
     setPeriodApplied(nextPeriod);
     setSelectedPost(null);
@@ -1591,6 +1671,60 @@ export default function Dashboard() {
     setView('report');
     setDeliveryNotice(null);
     syncReportLocation(nextPeriod);
+  };
+  const handleOpenSavedDraft = report => {
+    const nextPeriod = { since: report.date_from, until: report.date_to, reportId: report.id };
+    setActiveSavedReport(report);
+    setPreviewSnapshot(null);
+    setPeriodDraft(nextPeriod);
+    setPeriodApplied(nextPeriod);
+    setSelectedPost(null);
+    setTier('overview');
+    setView('report');
+    setDeliveryNotice(null);
+    window.history.replaceState({}, '', window.location.pathname);
+  };
+  const handleOpenSavedRevision = (report, revision) => {
+    setActiveSavedReport(report);
+    setPreviewSnapshot(revision.snapshot);
+    setPeriodDraft({ since: report.date_from, until: report.date_to, reportId: report.id });
+    setSelectedPost(null);
+    setTier('overview');
+    setView('report');
+    setDeliveryNotice({ type: 'success', message: `กำลังดู Revision v${revision.version} แบบ snapshot · การแก้ไขจะไม่เปลี่ยน Revision นี้` });
+    window.history.replaceState({}, '', window.location.pathname);
+  };
+  const publishActiveReport = async () => {
+    if (!activeSavedReport) return;
+    setShareCreating(true);
+    try {
+      const result = await publishSavedReport(activeSavedReport.id, `Published จากหน้ารายงาน ${new Date().toLocaleDateString('th-TH')}`);
+      setActiveSavedReport(result.report);
+      setDeliveryNotice({ type: 'success', message: `Publish สำเร็จ · เก็บ Revision v${result.revision.version} ในกล่องรายงานแล้ว` });
+    } catch (err) {
+      if (!handleSessionExpiry(err)) setDeliveryNotice({ type: 'error', message: err.message || 'Publish ไม่สำเร็จ' });
+    } finally { setShareCreating(false); }
+  };
+  const handleSavedPeriodApply = async nextPeriod => {
+    if (!activeSavedReport || !nextPeriod.since || !nextPeriod.until || nextPeriod.since > nextPeriod.until) return;
+    try {
+      const updated = await updateSavedReport(activeSavedReport.id, { date_from: nextPeriod.since, date_to: nextPeriod.until });
+      setActiveSavedReport(updated);
+      setPreviewSnapshot(null);
+      setPeriodApplied({ since: updated.date_from, until: updated.date_to, reportId: updated.id });
+      setRefreshKey(key => key + 1);
+      setDeliveryNotice({ type: 'success', message: 'อัปเดต Period ของ Draft แล้ว · Revision ที่ Publish ก่อนหน้ายังไม่เปลี่ยน' });
+    } catch (err) { if (!handleSessionExpiry(err)) setDeliveryNotice({ type: 'error', message: err.message }); }
+  };
+  const renameActiveReport = async () => {
+    if (!activeSavedReport) return;
+    const name = window.prompt('ชื่อรายงาน', activeSavedReport.name)?.trim();
+    if (!name || name === activeSavedReport.name) return;
+    try {
+      const updated = await updateSavedReport(activeSavedReport.id, { name });
+      setActiveSavedReport(updated);
+      setDeliveryNotice({ type: 'success', message: 'แก้ชื่อ Draft แล้ว · Revision เก่ายังคงชื่อและข้อมูลเดิม' });
+    } catch (err) { if (!handleSessionExpiry(err)) setDeliveryNotice({ type: 'error', message: err.message }); }
   };
   const handleProjectSwitch = projectId => {
     setSelectedProjectId(projectId);
@@ -1637,6 +1771,7 @@ export default function Dashboard() {
   const goPreviousTier = () => {
     if (tier === 'post') setTier('split');
     else if (tier === 'split') setTier('overview');
+    else if (activeSavedReport) setView('reports');
     else returnToReportScope();
   };
   const goNextTier = () => {
@@ -1683,9 +1818,10 @@ export default function Dashboard() {
     setPortfolio({ loading: false, error: null, data: snapshot });
     setSelectedProjectId(current => snapshot.projects.some(project => project.id === current) ? current : (snapshot.projects.find(project => project.status === 'active')?.id || null));
   };
-  const { loading, error, data } = state;
+  const { loading, error } = state;
+  const data = previewSnapshot || state.data;
   const selectedProject = portfolio.data?.projects.find(project => project.id === selectedProjectId) || null;
-  const viewTitles = { report: 'Facebook Performance', portfolio: 'Brands & projects', sources: 'Data workspace' };
+  const viewTitles = { reports: 'Report library', report: 'Facebook Performance', portfolio: 'Brands & projects', sources: 'Data workspace' };
 
   if (shareToken) return <PublicReportView token={shareToken} />;
 
@@ -1708,7 +1844,7 @@ export default function Dashboard() {
             <div className="workspace-title">{viewTitles[view]}</div>
           </div>
           <div className="topbar-actions">
-            {view !== 'portfolio' && (portfolio.data?.projects.length > 0 ? <label className="project-switcher"><span>Project</span><select value={selectedProjectId || ''} onChange={event => handleProjectSwitch(event.target.value)}>{portfolio.data.projects.filter(project => project.status === 'active').map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label> : <button className="secondary-action" type="button" onClick={() => setView('portfolio')}><FolderKanban size={15} /> ตั้งค่า Project</button>)}
+            {view === 'report' && !activeSavedReport && (portfolio.data?.projects.length > 0 ? <label className="project-switcher"><span>Project</span><select value={selectedProjectId || ''} onChange={event => handleProjectSwitch(event.target.value)}>{portfolio.data.projects.filter(project => project.status === 'active').map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label> : <button className="secondary-action" type="button" onClick={() => setView('portfolio')}><FolderKanban size={15} /> ตั้งค่า Project</button>)}
             <button className="data-health-button" onClick={() => setView('sources')}>
               <span className={`health-indicator ${error ? 'error' : ''}`}></span>
               {error ? 'Data source error' : data?.demo ? 'Demo source active' : 'Sources healthy'}
@@ -1717,7 +1853,9 @@ export default function Dashboard() {
         </header>
 
         <div className="workspace-content">
-          {view === 'portfolio' ? (
+          {view === 'reports' ? (
+            <ReportLibraryView portfolio={portfolio} onOpenDraft={handleOpenSavedDraft} onOpenRevision={handleOpenSavedRevision} onSessionExpiry={handleSessionExpiry} />
+          ) : view === 'portfolio' ? (
             <PortfolioView portfolio={portfolio} selectedProjectId={selectedProjectId} navigateRequest={portfolioNavigation} onNavigationComplete={() => setPortfolioNavigation(null)} onSelectProject={setSelectedProjectId} onPortfolioChange={handlePortfolioChange} onSessionExpiry={handleSessionExpiry} onOpenReport={handleOpenReportPeriod} />
           ) : view === 'sources' ? (
             <DataSourcesView
@@ -1734,8 +1872,10 @@ export default function Dashboard() {
               <div className="report-header">
                 <div>
                   <div className="report-title-line">
-                    <h1>{data?.page?.name || 'Performance Analyzer'}</h1>
+                    <h1>{activeSavedReport?.name || data?.page?.name || 'Performance Analyzer'}</h1>
+                    {activeSavedReport && <button className="report-title-edit" type="button" onClick={renameActiveReport} aria-label="แก้ชื่อรายงาน"><Pencil size={13} /></button>}
                     {data?.demo && <span className="demo-badge">Demo simulation</span>}
+                    {activeSavedReport && <span className={`report-status ${activeSavedReport.status}`}>{activeSavedReport.status === 'published' ? `Published · v${activeSavedReport.current_revision}` : 'Draft'}</span>}
                   </div>
                   <p>
                     {data ? `${data.counts.total} posts · ${data.counts.boosted} boosted · ${data.counts.ads} pure ads · ${data.range.since} – ${data.range.until}` : 'กำลังเชื่อมต่อ backend...'}
@@ -1751,13 +1891,14 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <PeriodControl value={periodDraft} onChange={setPeriodDraft} onApply={handlePeriodApply} loading={loading} />
+              <PeriodControl value={periodDraft} onChange={setPeriodDraft} onApply={activeSavedReport ? handleSavedPeriodApply : handlePeriodApply} loading={loading} />
               {data?.scope && <div className="scope-evidence" role="status"><ShieldCheck size={16} /><div><strong>{data.scope.project_name} · {data.scope.period_label}</strong><span>{data.scope.campaigns.length} Campaigns จาก {new Set(data.scope.campaigns.map(campaign => `${campaign.source}:${campaign.source_account_id}`)).size} accounts ผ่าน backend validation</span></div></div>}
 
               <section className="report-delivery" aria-label="ส่งออกรายงาน">
-                <div><strong>ส่งรายงานให้ลูกค้า</strong><span>CSV สำหรับตรวจข้อมูล · PDF สำหรับส่งไฟล์ · Client link เป็น snapshot อ่านอย่างเดียว 30 วัน</span></div>
+                <div><strong>{activeSavedReport ? 'จัดเก็บและส่งมอบรายงาน' : 'ส่งรายงานให้ลูกค้า'}</strong><span>{activeSavedReport ? 'Submit จะสร้าง Revision ใหม่ในกล่องรายงาน · ข้อมูลเก่าไม่ถูกเขียนทับ' : 'CSV สำหรับตรวจข้อมูล · PDF สำหรับส่งไฟล์ · Client link เป็น snapshot อ่านอย่างเดียว 30 วัน'}</span></div>
                 <div className="report-delivery-actions">
-                  <button type="button" onClick={copyReportLink} disabled={!data || shareCreating}>{shareCreating ? <LoaderCircle className="button-spinner" size={15} /> : <Share2 size={15} />} {shareCreating ? 'กำลังสร้าง...' : 'สร้าง Client link'}</button>
+                  {activeSavedReport && <button className="publish-report-button" type="button" onClick={publishActiveReport} disabled={!data || shareCreating}><Check size={15} /> {activeSavedReport.current_revision ? 'Publish Revision ใหม่' : 'Submit & Publish'}</button>}
+                  {!activeSavedReport && <button type="button" onClick={copyReportLink} disabled={!data || shareCreating}>{shareCreating ? <LoaderCircle className="button-spinner" size={15} /> : <Share2 size={15} />} {shareCreating ? 'กำลังสร้าง...' : 'สร้าง Client link'}</button>}
                   <button type="button" onClick={() => data && downloadCsv(data, mode, selectedProject)} disabled={!data}><Download size={15} /> Export CSV</button>
                   <button type="button" onClick={() => window.print()} disabled={!data}><Printer size={15} /> บันทึก PDF</button>
                 </div>
@@ -1794,7 +1935,7 @@ export default function Dashboard() {
                 )}
               </div>
               <nav className="report-flow-actions" aria-label="ย้อนกลับและไปต่อในรายงาน">
-                <button className="secondary-action" type="button" onClick={goPreviousTier}><ArrowLeft size={15} /> {tier === 'overview' ? 'กลับไปเลือก Scope' : tier === 'split' ? 'Overview' : 'Ads vs Organic'}</button>
+                <button className="secondary-action" type="button" onClick={goPreviousTier}><ArrowLeft size={15} /> {tier === 'overview' ? (activeSavedReport ? 'กลับกล่องรายงาน' : 'กลับไปเลือก Scope') : tier === 'split' ? 'Overview' : 'Ads vs Organic'}</button>
                 <span>{tier === 'overview' ? 'ขั้นถัดไปเปรียบเทียบ Paid และ Organic' : tier === 'split' && !selectedPost ? 'เลือกโพสต์จาก Overview เพื่อเปิด Deep-dive' : tier === 'split' ? 'พร้อมดูรายละเอียดโพสต์ที่เลือก' : 'ถึงขั้นสุดท้ายของรายงานแล้ว'}</span>
                 {tier !== 'post' && <button className="primary-action" type="button" onClick={goNextTier} disabled={tier === 'split' && !selectedPost}>{tier === 'overview' ? 'ถัดไป: Ads vs Organic' : 'ถัดไป: Post deep-dive'} <ArrowRight size={15} /></button>}
               </nav>
@@ -1806,7 +1947,7 @@ export default function Dashboard() {
                 <TierAdsOrganic data={data} />
                 {selectedPost && <><h2>Post deep-dive</h2><TierPostDetail post={selectedPost} baseline={data.baseline} /></>}
               </div>}
-              <ReportElementsPanel project={selectedProject} onOpenPortfolio={() => setView('portfolio')} onSessionExpiry={handleSessionExpiry} />
+              <ReportElementsPanel project={activeSavedReport ? { id: activeSavedReport.id, name: activeSavedReport.name } : selectedProject} onOpenPortfolio={() => setView(activeSavedReport ? 'reports' : 'portfolio')} onSessionExpiry={handleSessionExpiry} />
             </section>
           )}
         </div>
