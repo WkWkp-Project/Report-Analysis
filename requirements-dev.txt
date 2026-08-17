@@ -7,4 +7,4 @@ plotly==6.7.0
 
 # Reserved for the file-import implementation stage
 openpyxl==3.1.5
-python-multipart==0.0.29
+python-multipart==0.0.31

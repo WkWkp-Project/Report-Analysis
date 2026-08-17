@@ -14,6 +14,22 @@ from typing import Optional
 MIN_SAMPLE = 5  # จำนวน posts ขั้นต่ำที่จะ compute
 
 
+def _parse_created_time(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _feature_value(fn, post: dict):
+    try:
+        return fn(post)
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
 # ──────────────────────────────────────────────────────────────
 # CORRELATION ANALYSIS
 # ──────────────────────────────────────────────────────────────
@@ -51,11 +67,10 @@ def compute_correlations(posts: list[dict], baseline: dict) -> list[dict]:
             if eng is None:
                 continue
             er = eng / reach * 100
-            try:
-                fval = fn(p)
-                pairs.append((fval, er))
-            except Exception:
+            fval = _feature_value(fn, p)
+            if fval is None:
                 continue
+            pairs.append((fval, er))
 
         if len(pairs) < MIN_SAMPLE:
             continue
@@ -187,9 +202,8 @@ def compute_time_heatmap(posts: list[dict]) -> list[dict]:
     for p in posts:
         ct = p.get("created_time", "")
         if not ct: continue
-        try:
-            dt = datetime.fromisoformat(ct.replace("Z", "+00:00"))
-        except Exception:
+        dt = _parse_created_time(ct)
+        if dt is None:
             continue
         reach = p.get("reach") or 0
         eng = p.get("engaged_users")
@@ -240,9 +254,8 @@ def build_schedule_plan(
     for p in posts:
         ct = p.get("created_time", "")
         if not ct: continue
-        try:
-            dt = datetime.fromisoformat(ct.replace("Z", "+00:00"))
-        except Exception:
+        dt = _parse_created_time(ct)
+        if dt is None:
             continue
         ps = scores.get(p["post_id"])
         if not ps or ps.total is None: continue
@@ -332,11 +345,8 @@ def _ci(values: list[float], coverage: float = 0.8) -> tuple:
 
 
 def _hour_of(created_time: str) -> int:
-    try:
-        dt = datetime.fromisoformat(created_time.replace("Z", "+00:00"))
-        return dt.hour
-    except Exception:
-        return -1
+    dt = _parse_created_time(created_time)
+    return dt.hour if dt is not None else -1
 
 
 def _has_cta_first_line(text: str) -> int:

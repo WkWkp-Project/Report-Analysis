@@ -22,7 +22,8 @@ _TITLES = [
 
 
 def sample_posts(n: int = 32, seed: int = 7) -> list[dict]:
-    rng = random.Random(seed)
+    # Deterministic demo fixture; this generator never creates secrets.
+    rng = random.Random(seed)  # nosec B311
     start = datetime(2026, 1, 1, tzinfo=None)
     posts = []
     for i in range(n):

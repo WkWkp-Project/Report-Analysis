@@ -5,15 +5,19 @@ Facebook Graph API + Marketing API client
 ถ้าดึง field ไม่ได้ จะ return None ไม่ใช่ 0 หรือค่าสมมติ
 """
 
+import logging
 import os
 import time
 import requests
 from datetime import datetime, timedelta
 from typing import Optional
 
+from facebook_connection import FacebookConnectionError, _validated_graph_url
+
 
 GRAPH_VERSION = os.getenv("FB_GRAPH_API_VERSION", "v25.0").lstrip("v")
 BASE = f"https://graph.facebook.com/v{GRAPH_VERSION}"
+logger = logging.getLogger(__name__)
 
 
 class FBClient:
@@ -123,10 +127,14 @@ class FBClient:
                     f"/{post_id}/insights",
                     {"metric": ",".join(chunk), "period": "lifetime"}
                 )
-                for item in data.get("data", []):
-                    result[item["name"]] = item.get("values", [{}])[0].get("value")
-            except Exception:
-                pass
+            except (requests.RequestException, RuntimeError, FacebookConnectionError):
+                logger.info("Optional Facebook insight metric chunk is unavailable")
+                data = {}
+            for item in data.get("data", []):
+                name = item.get("name")
+                values = item.get("values")
+                if name and isinstance(values, list) and values and isinstance(values[0], dict):
+                    result[name] = values[0].get("value")
             time.sleep(0.2)
 
         return result
@@ -385,9 +393,9 @@ class FBClient:
                 data = self.get_full_post_data(post, since, until)
                 full_data.append(data)
                 time.sleep(0.5)  # rate limiting
-            except Exception as e:
-                # log แต่ไม่ crash — ข้ามโพสต์นั้น
-                print(f"[WARN] skip post {post['id']}: {e}")
+            except Exception:
+                # Keep the batch alive without forwarding provider diagnostics or tokens.
+                logger.exception("Skipping Facebook post %s after processing failure", post.get("id"))
         return full_data
 
     # ───────────────────────────────────────────────────────────
@@ -395,13 +403,21 @@ class FBClient:
     # ───────────────────────────────────────────────────────────
 
     def _get(self, path: str, params: dict = None) -> dict:
-        url = path if path.startswith("http") else f"{BASE}{path}"
-        p = {"access_token": self.token, **(params or {})}
-        resp = requests.get(url, params=p, timeout=30)
+        url = _validated_graph_url(path if path.startswith("http") else f"{BASE}{path}")
+        request_params = dict(params or {})
+        request_params.pop("access_token", None)
+        resp = requests.get(
+            url,
+            params=request_params,
+            headers={"Authorization": f"Bearer {self.token}", "Accept": "application/json"},
+            timeout=30,
+        )
         resp.raise_for_status()
         data = resp.json()
         if "error" in data:
-            raise RuntimeError(f"Graph API error: {data['error']}")
+            code = data.get("error", {}).get("code")
+            suffix = f" (code {code})" if code else ""
+            raise RuntimeError(f"Meta rejected the request{suffix}")
         return data
 
 
