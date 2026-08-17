@@ -1405,7 +1405,7 @@ const PortfolioView = ({ portfolio, selectedProjectId, navigateRequest, onNaviga
                 <span className="project-card-main"><strong>{project.name}</strong><small>{project.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</small><span>{selectedBrand.name}</span></span>
                 <span className="project-mode"><CalendarRange size={15} /> {reportingModeLabel[project.reporting_mode]}</span>
                 <span className="project-card-stats"><span><strong>{projectPeriods.length}</strong> รอบรายงาน</span><span><strong>{projectAccounts.size}</strong> บัญชี</span><span><strong>{projectCampaigns.length}</strong> Campaigns</span></span>
-                <ChevronRight size={17} />
+                <span className="project-open-cue">เปิด Project <ChevronRight size={14} /></span>
               </button>;
             })}</div>}
           </>}
