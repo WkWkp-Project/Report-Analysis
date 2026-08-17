@@ -12,6 +12,7 @@ Endpoints
 """
 
 import hmac
+import logging
 import os
 from datetime import date, timedelta
 from pathlib import Path
@@ -21,7 +22,9 @@ from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
+from app_security import RateLimiter, SecuritySettings, SessionManager, SESSION_COOKIE
 from import_pipeline.models import ImportStage, SourceKind
 from import_pipeline.registry import DIMENSIONS, METRICS
 from scoring import PostScorer, calculate_baseline
@@ -30,21 +33,99 @@ import topic_extractor
 from facebook_connection import FacebookConnectionError, FacebookOAuthService
 
 load_dotenv()
+logger = logging.getLogger(__name__)
+security_settings = SecuritySettings.from_environment()
+session_manager = SessionManager(security_settings)
+rate_limiter = RateLimiter()
 
-app = FastAPI(title="FB Performance Analyzer API")
+app = FastAPI(
+    title="FB Performance Analyzer API",
+    docs_url=None if security_settings.production else "/docs",
+    redoc_url=None if security_settings.production else "/redoc",
+    openapi_url=None if security_settings.production else "/openapi.json",
+)
 
 allowed_origins = [
     origin.strip()
     for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
     if origin.strip()
 ]
+app_base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+if app_base_url not in allowed_origins:
+    allowed_origins.append(app_base_url)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
+
+
+def _apply_security_headers(request: Request, response: Response) -> Response:
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
+        "img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "script-src 'self'; connect-src 'self'; form-action 'self' https://www.facebook.com"
+    )
+    if app_base_url.startswith("https://"):
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and origin:
+        if origin.rstrip("/") not in allowed_origins:
+            response = JSONResponse(
+                status_code=403, content={"detail": "Origin ไม่ได้รับอนุญาต"}
+            )
+            return _apply_security_headers(request, response)
+
+    response = await call_next(request)
+    return _apply_security_headers(request, response)
+
+
+class LoginRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+
+
+def _client_key(request: Request, action: str) -> str:
+    client_host = request.client.host if request.client else "unknown"
+    return f"{action}:{client_host}"
+
+
+def _enforce_rate_limit(
+    request: Request, *, action: str, limit: int, window_seconds: int
+) -> None:
+    if not rate_limiter.allow(
+        _client_key(request, action), limit=limit, window_seconds=window_seconds
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail="ส่งคำขอถี่เกินไป กรุณารอสักครู่แล้วลองใหม่",
+            headers={"Retry-After": str(window_seconds)},
+        )
+
+
+def _is_authenticated(request: Request) -> bool:
+    if not security_settings.configured:
+        return not security_settings.production
+    return session_manager.verify_session(request.cookies.get(SESSION_COOKIE))
+
+
+def _require_authenticated(request: Request) -> None:
+    if not _is_authenticated(request):
+        raise HTTPException(status_code=401, detail="กรุณาเข้าสู่ระบบก่อนใช้งาน")
 
 
 def _has_credentials() -> bool:
@@ -92,18 +173,63 @@ def _enrich_with_claude(payload: dict, posts_raw: list) -> None:
         )
         if summary:
             payload["ai_summary"] = summary
-    except Exception as e:
-        payload["ai"] = {"enabled": False, "source": None, "error": str(e)[:200]}
+    except Exception:
+        logger.exception("Optional AI enrichment failed")
+        payload["ai"] = {
+            "enabled": False,
+            "source": None,
+            "error": "AI enrichment ไม่พร้อมใช้งานในรอบนี้",
+        }
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "has_credentials": _has_credentials()}
+    return {
+        "status": "ok",
+        "has_credentials": _has_credentials(),
+        "auth_configured": security_settings.configured,
+    }
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request):
+    return {
+        "configured": security_settings.configured,
+        "required": security_settings.configured or security_settings.production,
+        "authenticated": _is_authenticated(request),
+    }
+
+
+@app.post("/api/auth/login")
+def auth_login(payload: LoginRequest, request: Request, response: Response):
+    _enforce_rate_limit(request, action="login", limit=5, window_seconds=300)
+    if not security_settings.configured:
+        raise HTTPException(status_code=503, detail="ยังไม่ได้ตั้งค่าระบบล็อกอิน")
+    if not session_manager.password_matches(payload.password):
+        raise HTTPException(status_code=401, detail="รหัสผ่านไม่ถูกต้อง")
+    response.set_cookie(
+        SESSION_COOKIE,
+        session_manager.create_session(),
+        max_age=12 * 60 * 60,
+        httponly=True,
+        secure=app_base_url.startswith("https://"),
+        samesite="lax",
+        path="/",
+    )
+    return {"authenticated": True}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(request: Request, response: Response):
+    _require_authenticated(request)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"authenticated": False}
 
 
 @app.get("/api/import/contracts")
-def import_contracts():
+def import_contracts(request: Request):
     """Canonical contract used by future API/file import screens."""
+    _require_authenticated(request)
     return {
         "schema_version": 1,
         "stages": [stage.value for stage in ImportStage],
@@ -131,8 +257,9 @@ def import_contracts():
 
 
 @app.get("/api/facebook/status")
-def facebook_status():
+def facebook_status(request: Request):
     """Return safe connection metadata. Access tokens never leave the backend."""
+    _require_authenticated(request)
     try:
         return _facebook_service().status()
     except FacebookConnectionError as exc:
@@ -140,8 +267,10 @@ def facebook_status():
 
 
 @app.get("/api/facebook/oauth/start")
-def facebook_oauth_start(response: Response):
+def facebook_oauth_start(request: Request, response: Response):
     """Create a signed OAuth attempt and return Meta's consent URL."""
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="facebook_oauth", limit=10, window_seconds=600)
     try:
         service = _facebook_service()
         state = service.create_state()
@@ -172,6 +301,10 @@ def facebook_oauth_callback(
 ):
     """Exchange the code server-side, encrypt tokens, then return to the app."""
     service = _facebook_service()
+    if not _is_authenticated(request):
+        return RedirectResponse(
+            f"{service.config.frontend_url}/?auth=required", status_code=302
+        )
     stored_state = request.cookies.get("fb_oauth_state")
     state_matches = bool(state and stored_state and hmac.compare_digest(state, stored_state))
     if error:
@@ -192,8 +325,10 @@ def facebook_oauth_callback(
 
 
 @app.post("/api/facebook/refresh")
-def facebook_refresh():
+def facebook_refresh(request: Request):
     """Re-read accessible Pages and Ad Accounts from Meta."""
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="facebook_refresh", limit=10, window_seconds=60)
     try:
         return _facebook_service().refresh_resources()
     except FacebookConnectionError as exc:
@@ -201,18 +336,23 @@ def facebook_refresh():
 
 
 @app.delete("/api/facebook/connection")
-def facebook_disconnect():
+def facebook_disconnect(request: Request):
     """Delete this workspace's encrypted Facebook connection."""
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="facebook_disconnect", limit=5, window_seconds=60)
     deleted = _facebook_service().store.delete()
     return {"disconnected": deleted}
 
 
 @app.get("/api/analyze")
 def analyze(
+    request: Request,
     since: str = Query(default=None),
     until: str = Query(default=None),
     demo: int = Query(default=0),
 ):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="analyze", limit=30, window_seconds=60)
     until = until or str(date.today())
     since = since or str(date.today() - timedelta(days=90))
 
@@ -234,8 +374,12 @@ def analyze(
         payload = _run_pipeline(posts_raw, page_info, since, until)
         payload["demo"] = False
         return payload
-    except Exception as e:
-        return JSONResponse(status_code=502, content={"error": str(e)})
+    except Exception:
+        logger.exception("Facebook analysis pipeline failed")
+        return JSONResponse(
+            status_code=502,
+            content={"error": "ดึงหรือประมวลผลข้อมูลจาก Facebook ไม่สำเร็จ"},
+        )
 
 
 # Production serves the compiled React app from the same origin as the API.

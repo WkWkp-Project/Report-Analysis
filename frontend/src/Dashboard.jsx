@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle } from 'lucide-react';
-import { disconnectFacebook, fetchAnalysis, fetchFacebookStatus, refreshFacebookConnection, startFacebookConnection } from './api.js';
+import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle, LockKeyhole, LogOut } from 'lucide-react';
+import { disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, login, logout, refreshFacebookConnection, startFacebookConnection } from './api.js';
 import './styles.css';
 
 // ============ FORMATTERS ============
@@ -583,7 +583,7 @@ function buildRecommendations(p, er) {
   return recs;
 }
 
-const WorkspaceSidebar = ({ view, setView }) => {
+const WorkspaceSidebar = ({ view, setView, onLogout, canLogout }) => {
   const items = [
     { id: 'report', label: 'Facebook Performance', icon: BarChart3 },
     { id: 'sources', label: 'Data sources', icon: Database },
@@ -629,6 +629,7 @@ const WorkspaceSidebar = ({ view, setView }) => {
       </nav>
 
       <div className="sidebar-footer">
+        {canLogout && <button className="nav-item" onClick={onLogout}><LogOut size={17} /><span>ออกจากระบบ</span></button>}
         <button className="nav-item planned" disabled><Settings size={17} /><span>Settings</span></button>
         <div className="workspace-version">UI foundation · v1</div>
       </div>
@@ -785,6 +786,60 @@ const DataSourcesView = ({ loading, onRefresh, facebook, facebookNotice, onFaceb
   );
 };
 
+const LoginGate = ({ loading, error, onSubmit }) => {
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onSubmit(password);
+  };
+
+  return (
+    <main className="auth-shell" style={fontStyle}>
+      <section className="auth-panel" aria-labelledby="auth-title">
+        <div className="auth-brand">
+          <div className="brand-mark" aria-hidden="true">RA</div>
+          <div>
+            <div className="brand-name">Report Analysis</div>
+            <div className="brand-subtitle">Marketing intelligence</div>
+          </div>
+        </div>
+
+        <div className="auth-heading">
+          <div className="auth-lock" aria-hidden="true"><LockKeyhole size={19} /></div>
+          <h1 id="auth-title">เข้าสู่พื้นที่วิเคราะห์</h1>
+          <p>ข้อมูลบัญชี โทเคน และรายงานจะเปิดให้เฉพาะผู้ที่มีรหัสผ่านของ workspace นี้</p>
+        </div>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <label htmlFor="workspace-password">รหัสผ่าน workspace</label>
+          <input
+            id="workspace-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            minLength={1}
+            maxLength={256}
+            required
+            autoFocus
+            disabled={loading}
+          />
+          {error && <div className="auth-error" role="alert"><AlertCircle size={16} /><span>{error}</span></div>}
+          <button className="primary-action auth-submit" type="submit" disabled={loading || !password}>
+            {loading ? <><LoaderCircle className="button-spinner" size={16} /> กำลังตรวจสอบ...</> : <><ShieldCheck size={16} /> เข้าสู่ระบบ</>}
+          </button>
+        </form>
+
+        <div className="auth-note">
+          <ShieldCheck size={16} />
+          <span>ระบบใช้ session cookie แบบ HttpOnly และไม่ส่งรหัสผ่านไปเก็บใน browser</span>
+        </div>
+      </section>
+    </main>
+  );
+};
+
 // ============ MAIN APP ============
 export default function Dashboard() {
   const [view, setView] = useState('report');
@@ -795,15 +850,34 @@ export default function Dashboard() {
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [facebook, setFacebook] = useState({ loading: true, connecting: false, error: null, data: null });
   const [facebookNotice, setFacebookNotice] = useState(null);
+  const [auth, setAuth] = useState({ loading: true, submitting: false, error: null, configured: false, required: false, authenticated: false });
+  const appReady = !auth.loading && (!auth.required || auth.authenticated);
+
+  const handleSessionExpiry = (err) => {
+    if (err?.status !== 401) return false;
+    setAuth(current => ({ ...current, authenticated: false, error: 'Session หมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง' }));
+    return true;
+  };
+
+  useEffect(() => {
+    fetchAuthStatus()
+      .then(data => setAuth({ loading: false, submitting: false, error: null, ...data }))
+      .catch(() => setAuth(current => ({ ...current, loading: false, error: 'ตรวจสอบระบบล็อกอินไม่ได้ กรุณาตรวจว่า backend ทำงานอยู่' })));
+  }, []);
 
   const loadFacebookStatus = () => {
     setFacebook(current => ({ ...current, loading: true, error: null }));
     return fetchFacebookStatus()
       .then(data => setFacebook({ loading: false, connecting: false, error: null, data }))
-      .catch(err => setFacebook(current => ({ ...current, loading: false, connecting: false, error: err.message })));
+      .catch(err => {
+        if (!handleSessionExpiry(err)) {
+          setFacebook(current => ({ ...current, loading: false, connecting: false, error: err.message }));
+        }
+      });
   };
 
   useEffect(() => {
+    if (!appReady) return;
     loadFacebookStatus();
     const params = new URLSearchParams(window.location.search);
     const result = params.get('facebook');
@@ -819,16 +893,40 @@ export default function Dashboard() {
       setFacebookNotice(messages[result] || null);
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []);
+  }, [appReady]);
 
   useEffect(() => {
+    if (!appReady) return undefined;
     let alive = true;
     setState({ loading: true, error: null, data: null });
     fetchAnalysis()
       .then(data => { if (alive) setState({ loading: false, error: null, data }); })
-      .catch(err => { if (alive) setState({ loading: false, error: err.message, data: null }); });
+      .catch(err => {
+        if (alive && !handleSessionExpiry(err)) setState({ loading: false, error: err.message, data: null });
+      });
     return () => { alive = false; };
-  }, [refreshKey]);
+  }, [refreshKey, appReady]);
+
+  const handleLogin = async (password) => {
+    setAuth(current => ({ ...current, submitting: true, error: null }));
+    try {
+      await login(password);
+      const status = await fetchAuthStatus();
+      setAuth({ loading: false, submitting: false, error: null, ...status });
+    } catch (err) {
+      setAuth(current => ({ ...current, submitting: false, error: err.message }));
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      setAuth(current => ({ ...current, authenticated: false, error: null }));
+      setState({ loading: true, error: null, data: null });
+      setFacebook({ loading: true, connecting: false, error: null, data: null });
+    }
+  };
 
   const handleSelect = (post) => { setSelectedPost(post); setTier('post'); };
   const handleFacebookConnect = async () => {
@@ -838,7 +936,7 @@ export default function Dashboard() {
       const authorizationUrl = await startFacebookConnection();
       window.location.assign(authorizationUrl);
     } catch (err) {
-      setFacebook(current => ({ ...current, connecting: false, error: err.message }));
+      if (!handleSessionExpiry(err)) setFacebook(current => ({ ...current, connecting: false, error: err.message }));
     }
   };
   const handleFacebookRefresh = async () => {
@@ -848,7 +946,7 @@ export default function Dashboard() {
       await loadFacebookStatus();
       setFacebookNotice({ type: 'success', message: 'อัปเดตรายการ Page และ Ad Account จาก Meta แล้ว' });
     } catch (err) {
-      setFacebook(current => ({ ...current, connecting: false, error: err.message }));
+      if (!handleSessionExpiry(err)) setFacebook(current => ({ ...current, connecting: false, error: err.message }));
     }
   };
   const handleFacebookDisconnect = async () => {
@@ -859,14 +957,22 @@ export default function Dashboard() {
       await loadFacebookStatus();
       setFacebookNotice({ type: 'success', message: 'ยกเลิกการเชื่อมและลบ token ที่บันทึกไว้แล้ว' });
     } catch (err) {
-      setFacebook(current => ({ ...current, connecting: false, error: err.message }));
+      if (!handleSessionExpiry(err)) setFacebook(current => ({ ...current, connecting: false, error: err.message }));
     }
   };
   const { loading, error, data } = state;
 
+  if (auth.loading) {
+    return <main className="auth-shell" style={fontStyle}><div className="auth-loading"><LoaderCircle size={18} /> กำลังตรวจสอบพื้นที่ทำงาน...</div></main>;
+  }
+
+  if (auth.required && !auth.authenticated) {
+    return <LoginGate loading={auth.submitting} error={auth.error} onSubmit={handleLogin} />;
+  }
+
   return (
     <div className="app-shell" style={fontStyle}>
-      <WorkspaceSidebar view={view} setView={setView} />
+      <WorkspaceSidebar view={view} setView={setView} onLogout={handleLogout} canLogout={auth.configured} />
 
       <main className="workspace-main">
         <header className="workspace-topbar">
