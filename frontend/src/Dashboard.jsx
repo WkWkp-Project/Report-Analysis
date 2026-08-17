@@ -1830,13 +1830,15 @@ export default function Dashboard() {
     }
   };
   const goPreviousTier = () => {
-    if (tier === 'post') setTier('split');
-    else if (tier === 'split') setTier('overview');
+    if (tier === 'post') setTier('content');
+    else if (tier === 'split') setTier('content');
+    else if (tier === 'content') setTier('overview');
     else if (activeSavedReport) setView('reports');
     else returnToReportScope();
   };
   const goNextTier = () => {
-    if (tier === 'overview') setTier('split');
+    if (tier === 'overview') setTier('content');
+    else if (tier === 'content') setTier('split');
     else if (tier === 'split' && selectedPost) setTier('post');
   };
   const focusAnalysisComment = () => {
@@ -1972,10 +1974,12 @@ export default function Dashboard() {
                 )}
                 <button className={tier === 'overview' ? 'active' : ''} onClick={() => setTier('overview')}><span>1</span> Overview</button>
                 <ChevronRight className="tier-chevron" size={13} />
-                <button className={tier === 'split' ? 'active' : ''} onClick={() => setTier('split')}><span>2</span> Ads vs Organic</button>
+                <button className={tier === 'content' ? 'active' : ''} onClick={() => setTier('content')}><span>2</span> Content table</button>
+                <ChevronRight className="tier-chevron" size={13} />
+                <button className={tier === 'split' ? 'active' : ''} onClick={() => setTier('split')}><span>3</span> Ads vs Organic</button>
                 <ChevronRight className="tier-chevron" size={13} />
                 <button className={tier === 'post' ? 'active' : ''} onClick={() => selectedPost && setTier('post')} disabled={!selectedPost}>
-                  <span>3</span> Post deep-dive {!selectedPost && <small>เลือกโพสต์ก่อน</small>}
+                  <span>4</span> Post deep-dive {!selectedPost && <small>เลือกคอนเทนต์ก่อน</small>}
                 </button>
               </nav>
 
@@ -1990,20 +1994,23 @@ export default function Dashboard() {
                 {data && !loading && (
                   <>
                     {tier === 'overview' && <><TierOverview data={data} mode={mode} onSelectPost={handleSelect} /><CampaignResultsTable data={data} onRefresh={() => setRefreshKey(key => key + 1)} onSessionExpiry={handleSessionExpiry} /></>}
+                    {tier === 'content' && <ClientContentIndex posts={applyMode(data.posts, mode)} onSelect={handleSelect} />}
                     {tier === 'split' && <TierAdsOrganic data={data} />}
                     {tier === 'post' && selectedPost && <TierPostDetail post={selectedPost} baseline={data.baseline} />}
                   </>
                 )}
               </div>
               <nav className="report-flow-actions" aria-label="ย้อนกลับและไปต่อในรายงาน">
-                <button className="secondary-action" type="button" onClick={goPreviousTier}><ArrowLeft size={15} /> {tier === 'overview' ? (activeSavedReport ? 'กลับกล่องรายงาน' : 'กลับไปเลือก Scope') : tier === 'split' ? 'Overview' : 'Ads vs Organic'}</button>
-                <span>{tier === 'overview' ? 'ขั้นถัดไปเปรียบเทียบ Paid และ Organic' : tier === 'split' && !selectedPost ? 'เลือกโพสต์จาก Overview เพื่อเปิด Deep-dive' : tier === 'split' ? 'พร้อมดูรายละเอียดโพสต์ที่เลือก' : 'ถึงขั้นสุดท้ายของรายงานแล้ว'}</span>
-                {tier !== 'post' && <button className="primary-action" type="button" onClick={goNextTier} disabled={tier === 'split' && !selectedPost}>{tier === 'overview' ? 'ถัดไป: Ads vs Organic' : 'ถัดไป: Post deep-dive'} <ArrowRight size={15} /></button>}
+                <button className="secondary-action" type="button" onClick={goPreviousTier}><ArrowLeft size={15} /> {tier === 'overview' ? (activeSavedReport ? 'กลับกล่องรายงาน' : 'กลับไปเลือก Scope') : tier === 'content' ? 'Overview' : tier === 'split' ? 'Content table' : 'Content table'}</button>
+                <span>{tier === 'overview' ? 'ขั้นถัดไปดูรายการคอนเทนต์ทั้งหมด' : tier === 'content' ? 'กดรายการเพื่อเปิดรายละเอียด หรือไปต่อเพื่อเทียบ Paid/Organic' : tier === 'split' && !selectedPost ? 'เลือกคอนเทนต์จากตารางเพื่อเปิด Deep-dive' : tier === 'split' ? 'พร้อมดูรายละเอียดคอนเทนต์ที่เลือก' : 'ถึงขั้นสุดท้ายของรายงานแล้ว'}</span>
+                {tier !== 'post' && <button className="primary-action" type="button" onClick={goNextTier} disabled={tier === 'split' && !selectedPost}>{tier === 'overview' ? 'ถัดไป: Content table' : tier === 'content' ? 'ถัดไป: Ads vs Organic' : 'ถัดไป: Post deep-dive'} <ArrowRight size={15} /></button>}
               </nav>
               {data && <div className="print-report" aria-hidden="true">
                 <h2>Overview</h2>
                 <TierOverview data={data} mode={mode} onSelectPost={() => {}} />
                 <CampaignResultsTable data={data} readOnly />
+                <h2>Content results</h2>
+                <ClientContentIndex posts={applyMode(data.posts, mode)} onSelect={() => {}} />
                 <h2>Ads vs Organic</h2>
                 <TierAdsOrganic data={data} />
                 {selectedPost && <><h2>Post deep-dive</h2><TierPostDetail post={selectedPost} baseline={data.baseline} /></>}

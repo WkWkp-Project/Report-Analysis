@@ -946,6 +946,8 @@ label:focus-within {
   .campaign-table td:first-child { position: static; min-width: 110px; }
   .print-report > h2 { margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #d6d3d1; font-size: 16px; }
   .print-report button { color: inherit; }
+  .print-report .client-content-table th:last-child,
+  .print-report .client-content-table td:last-child { display:none; }
   .report-elements { break-before: page; }
   .funnel-metric,
   .project-workbench,
