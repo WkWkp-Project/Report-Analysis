@@ -8,6 +8,7 @@ from portfolio import (
     PortfolioError,
     PortfolioStore,
     ProjectCreate,
+    ReportPeriodCreate,
     WorkspaceUpdate,
 )
 
@@ -25,6 +26,14 @@ class PortfolioStoreTests(unittest.TestCase):
                 ProjectCreate(name="Q3 Launch", brand_ids=[brand_id])
             )
             project_id = snapshot.projects[0].id
+            snapshot = store.create_period(
+                ReportPeriodCreate(
+                    project_id=project_id,
+                    label="August 2026",
+                    date_from="2026-08-01",
+                    date_to="2026-08-31",
+                )
+            )
             snapshot = store.create_campaign(
                 CampaignCreate(
                     project_id=project_id,
@@ -40,6 +49,34 @@ class PortfolioStoreTests(unittest.TestCase):
             self.assertEqual(restored.workspace.name, "Agency workspace")
             self.assertEqual(restored.campaigns[0].name, "Conversion launch")
             self.assertEqual(restored.campaigns[0].project_id, project_id)
+            self.assertEqual(restored.periods[0].label, "August 2026")
+            self.assertEqual(restored.projects[0].reporting_mode, "monthly")
+
+    def test_period_rejects_duplicate_range_and_unknown_project(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = PortfolioStore(Path(directory))
+            with self.assertRaises(PortfolioError):
+                store.create_period(
+                    ReportPeriodCreate(
+                        project_id="prj_ffffffffffffffff",
+                        label="Missing",
+                        date_from="2026-08-01",
+                        date_to="2026-08-31",
+                    )
+                )
+            snapshot = store.create_brand(BrandCreate(name="Brand A"))
+            snapshot = store.create_project(
+                ProjectCreate(name="Monthly report", brand_ids=[snapshot.brands[0].id])
+            )
+            payload = ReportPeriodCreate(
+                project_id=snapshot.projects[0].id,
+                label="August 2026",
+                date_from="2026-08-01",
+                date_to="2026-08-31",
+            )
+            store.create_period(payload)
+            with self.assertRaises(PortfolioError):
+                store.create_period(payload)
 
     def test_project_rejects_unknown_brand(self):
         with tempfile.TemporaryDirectory() as directory:

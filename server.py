@@ -33,6 +33,7 @@ from portfolio import (
     PortfolioError,
     PortfolioStore,
     ProjectCreate,
+    ReportPeriodCreate,
     WorkspaceUpdate,
 )
 from report_elements import (
@@ -151,6 +152,61 @@ def _require_project(project_id: str) -> None:
         raise HTTPException(status_code=500, detail="อ่าน portfolio registry ไม่สำเร็จ") from exc
     if not any(project.id == project_id for project in projects):
         raise HTTPException(status_code=404, detail="ไม่พบโปรเจกต์ที่เลือก")
+
+
+def _resolve_analysis_scope(
+    project_id: str | None,
+    period_id: str | None,
+    campaign_ids: list[str],
+) -> dict | None:
+    if not project_id and not period_id and not campaign_ids:
+        return None
+    if not project_id or not period_id or not campaign_ids:
+        raise HTTPException(
+            status_code=422,
+            detail="ต้องเลือก Project, Period และ Campaign อย่างน้อยหนึ่งรายการให้ครบ",
+        )
+    try:
+        snapshot = portfolio_store.snapshot()
+    except PortfolioError as exc:
+        raise HTTPException(status_code=500, detail="อ่าน portfolio registry ไม่สำเร็จ") from exc
+    project = next((item for item in snapshot.projects if item.id == project_id), None)
+    if project is None:
+        raise HTTPException(status_code=404, detail="ไม่พบโปรเจกต์ที่เลือก")
+    period = next(
+        (
+            item
+            for item in snapshot.periods
+            if item.id == period_id and item.project_id == project_id
+        ),
+        None,
+    )
+    if period is None:
+        raise HTTPException(status_code=422, detail="Period ไม่ได้อยู่ใน Project ที่เลือก")
+    unique_campaign_ids = list(dict.fromkeys(campaign_ids))
+    selected_campaigns = [
+        item
+        for item in snapshot.campaigns
+        if item.id in unique_campaign_ids and item.project_id == project_id
+    ]
+    if len(selected_campaigns) != len(unique_campaign_ids):
+        raise HTTPException(status_code=422, detail="Campaign scope ไม่ตรงกับ Project ที่เลือก")
+    return {
+        "project_id": project.id,
+        "project_name": project.name,
+        "period_id": period.id,
+        "period_label": period.label,
+        "campaigns": [
+            {
+                "id": item.id,
+                "name": item.name,
+                "source": item.source,
+                "source_account_id": item.source_account_id,
+                "source_campaign_id": item.source_campaign_id,
+            }
+            for item in selected_campaigns
+        ],
+    }
 
 
 def _has_credentials() -> bool:
@@ -314,6 +370,16 @@ def portfolio_create_project(payload: ProjectCreate, request: Request):
     _enforce_rate_limit(request, action="portfolio_write", limit=60, window_seconds=60)
     try:
         return portfolio_store.create_project(payload).model_dump(mode="json")
+    except PortfolioError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/portfolio/periods", status_code=201)
+def portfolio_create_period(payload: ReportPeriodCreate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="portfolio_write", limit=60, window_seconds=60)
+    try:
+        return portfolio_store.create_period(payload).model_dump(mode="json")
     except PortfolioError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -488,6 +554,9 @@ def analyze(
     since: date | None = Query(default=None),
     until: date | None = Query(default=None),
     demo: int = Query(default=0),
+    project_id: str | None = Query(default=None, max_length=80),
+    period_id: str | None = Query(default=None, max_length=80),
+    campaign_ids: list[str] | None = Query(default=None),
 ):
     _require_authenticated(request)
     _enforce_rate_limit(request, action="analyze", limit=30, window_seconds=60)
@@ -497,6 +566,7 @@ def analyze(
         raise HTTPException(status_code=422, detail="วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด")
     since_value = str(since_date)
     until_value = str(until_date)
+    analysis_scope = _resolve_analysis_scope(project_id, period_id, campaign_ids or [])
 
     use_demo = bool(demo) or not _has_credentials()
 
@@ -506,7 +576,14 @@ def analyze(
         page_info = sample_page_info()
         payload = _run_pipeline(posts_raw, page_info, since_value, until_value)
         payload["demo"] = True
+        payload["scope"] = analysis_scope
         return payload
+
+    if analysis_scope:
+        raise HTTPException(
+            status_code=501,
+            detail="Project-scoped live import ต้องใช้ Ads Insights connector ซึ่งยังไม่เปิดใช้งาน",
+        )
 
     try:
         from api_client import FBClient
@@ -515,6 +592,7 @@ def analyze(
         posts_raw = client.pull_all(since_value, until_value)
         payload = _run_pipeline(posts_raw, page_info, since_value, until_value)
         payload["demo"] = False
+        payload["scope"] = None
         return payload
     except Exception:
         logger.exception("Facebook analysis pipeline failed")

@@ -66,6 +66,19 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         self.login()
         brand_id, project_id = self.create_project()
 
+        period_response = self.client.post(
+            "/api/portfolio/periods",
+            json={
+                "project_id": project_id,
+                "label": "August 2026",
+                "date_from": "2026-08-01",
+                "date_to": "2026-08-31",
+            },
+        )
+        self.assertEqual(period_response.status_code, 201)
+        self.assertEqual(period_response.json()["periods"][0]["project_id"], project_id)
+        period_id = period_response.json()["periods"][0]["id"]
+
         campaign_response = self.client.post(
             "/api/portfolio/campaigns",
             json={
@@ -79,6 +92,29 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         )
         self.assertEqual(campaign_response.status_code, 201)
         self.assertEqual(campaign_response.json()["campaigns"][0]["project_id"], project_id)
+        campaign_id = campaign_response.json()["campaigns"][0]["id"]
+
+        scoped_analysis = self.client.get(
+            "/api/analyze",
+            params=[
+                ("since", "2026-08-01"),
+                ("until", "2026-08-31"),
+                ("demo", "1"),
+                ("project_id", project_id),
+                ("period_id", period_id),
+                ("campaign_ids", campaign_id),
+            ],
+        )
+        self.assertEqual(scoped_analysis.status_code, 200)
+        self.assertEqual(scoped_analysis.json()["scope"]["project_id"], project_id)
+        self.assertEqual(
+            scoped_analysis.json()["scope"]["campaigns"][0]["id"], campaign_id
+        )
+
+        incomplete_scope = self.client.get(
+            "/api/analyze?demo=1&project_id=" + project_id
+        )
+        self.assertEqual(incomplete_scope.status_code, 422)
 
     def test_report_elements_are_authenticated_and_project_scoped(self):
         self.login()

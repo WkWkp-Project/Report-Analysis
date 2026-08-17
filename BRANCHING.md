@@ -13,6 +13,9 @@
 | `feature/workspace-portfolio-*` | Workspace, Brand, Project และ external Campaign registry | `portfolio.py`, portfolio API, tests |
 | `feature/report-elements-*` | text, comment, key takeaway และ next-step blocks ที่ผูกกับ project/report | report element model/API และ `frontend/src/` |
 | `feature/import-scope-*` | account/date/campaign/project/brand selection ก่อนเข้า import gates | import scope API/UI และ `import_pipeline/` |
+| `feature/provider-account-*` | registry ของ provider connection และ external account ที่ผูกกับ project | provider models/API, encrypted connection references, tests |
+| `feature/google-ads-*` | Google OAuth, account discovery และ Ads reporting adapter | Google Ads connector และ canonical mapping |
+| `feature/tiktok-ads-*` | TikTok OAuth, advertiser discovery และ reporting adapter | TikTok Ads connector และ canonical mapping |
 | `feature/scoring-analytics-*` | baseline, scoring, correlation, pattern และ schedule | `scoring.py`, `analyzer.py` |
 | `feature/ai-insights-*` | topic extraction และ narrative insight | `topic_extractor.py` |
 | `feature/streamlit-*` | Streamlit UI เดิม | `app.py` |
@@ -36,6 +39,7 @@
 fix/pre-api-security-hardening
   └── feature/workspace-portfolio-model
         ├── feature/report-elements-project-scoped
+        ├── feature/brand-first-workspace-navigation
         └── feature/import-scope-project-context
               └── feature/facebook-ads-insights-import
 ```

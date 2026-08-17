@@ -12,11 +12,14 @@ async function responseError(res) {
   return error;
 }
 
-export async function fetchAnalysis({ since, until, demo } = {}) {
+export async function fetchAnalysis({ since, until, demo, projectId, periodId, campaignIds = [] } = {}) {
   const params = new URLSearchParams();
   if (since) params.set('since', since);
   if (until) params.set('until', until);
   if (demo) params.set('demo', '1');
+  if (projectId) params.set('project_id', projectId);
+  if (periodId) params.set('period_id', periodId);
+  campaignIds.forEach(campaignId => params.append('campaign_ids', campaignId));
   const qs = params.toString();
   const res = await fetch(`/api/analyze${qs ? `?${qs}` : ''}`, { credentials: 'same-origin' });
   if (!res.ok) throw await responseError(res);
@@ -77,6 +80,14 @@ export function createBrand(payload) {
 
 export function createProject(payload) {
   return requestJson('/api/portfolio/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createPeriod(payload) {
+  return requestJson('/api/portfolio/periods', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

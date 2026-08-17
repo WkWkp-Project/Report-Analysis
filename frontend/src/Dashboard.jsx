@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle, LockKeyhole, LogOut, FolderKanban, Plus, MessageSquareText, ListChecks, Lightbulb, TextQuote, Pencil, Trash2, Save, Check } from 'lucide-react';
-import { createBrand, createCampaign, createProject, createReportElement, deleteReportElement, disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, fetchPortfolio, fetchReportElements, login, logout, refreshFacebookConnection, startFacebookConnection, updateReportElement } from './api.js';
+import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle, LockKeyhole, LogOut, FolderKanban, Plus, MessageSquareText, ListChecks, Lightbulb, TextQuote, Pencil, Trash2, Save, Check, ArrowLeft, CalendarRange, Cable } from 'lucide-react';
+import { createBrand, createCampaign, createPeriod, createProject, createReportElement, deleteReportElement, disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, fetchPortfolio, fetchReportElements, login, logout, refreshFacebookConnection, startFacebookConnection, updateReportElement } from './api.js';
 import './styles.css';
 
 // ============ FORMATTERS ============
@@ -675,9 +675,9 @@ const PeriodControl = ({ value, onChange, onApply, loading }) => {
       <button type="button" onClick={() => applyPreset('month')} disabled={loading}>เดือนนี้</button>
     </div>
     <div className="period-dates">
-      <label><span>ตั้งแต่</span><input type="date" max={value.until || today} value={value.since} onChange={event => onChange({ ...value, since: event.target.value })} /></label>
+      <label><span>ตั้งแต่</span><input type="date" max={value.until || today} value={value.since} onChange={event => onChange({ since: event.target.value, until: value.until })} /></label>
       <span className="period-separator" aria-hidden="true">—</span>
-      <label><span>ถึง</span><input type="date" min={value.since} max={today} value={value.until} onChange={event => onChange({ ...value, until: event.target.value })} /></label>
+      <label><span>ถึง</span><input type="date" min={value.since} max={today} value={value.until} onChange={event => onChange({ since: value.since, until: event.target.value })} /></label>
       <button className="period-apply" type="button" onClick={() => onApply(value)} disabled={loading || invalid}>{loading ? <LoaderCircle className="button-spinner" size={15} /> : <Calendar size={15} />} ใช้ช่วงเวลา</button>
     </div>
     {invalid && <div className="period-error" role="alert">วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด</div>}
@@ -833,21 +833,35 @@ const DataSourcesView = ({ loading, onRefresh, facebook, facebookNotice, onFaceb
   );
 };
 
-const PortfolioView = ({ portfolio, selectedProjectId, onSelectProject, onPortfolioChange, onSessionExpiry }) => {
+const PortfolioView = ({ portfolio, selectedProjectId, onSelectProject, onPortfolioChange, onSessionExpiry, onOpenReport }) => {
   const snapshot = portfolio.data;
   const brands = snapshot?.brands || [];
   const projects = snapshot?.projects || [];
+  const periods = snapshot?.periods || [];
   const campaigns = snapshot?.campaigns || [];
+  const [selectedBrandId, setSelectedBrandId] = useState(null);
+  const [openProjectId, setOpenProjectId] = useState(null);
+  const [selectedPeriodId, setSelectedPeriodId] = useState(null);
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState([]);
   const [stage, setStage] = useState('brand');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const [brandForm, setBrandForm] = useState({ name: '', code: '' });
-  const [projectForm, setProjectForm] = useState({ name: '', description: '', brand_ids: [] });
+  const [projectForm, setProjectForm] = useState({ name: '', description: '', brand_ids: [], reporting_mode: 'monthly' });
+  const [periodForm, setPeriodForm] = useState(() => {
+    const today = new Date();
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    const last = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    return { project_id: '', label: today.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }), date_from: dateInputValue(first), date_to: dateInputValue(last), cadence: 'monthly' };
+  });
   const [campaignForm, setCampaignForm] = useState({ project_id: '', source: 'facebook', source_account_id: '', source_campaign_id: '', name: '', brand_ids: [] });
 
   useEffect(() => {
     if (!campaignForm.project_id && projects[0]) {
       setCampaignForm(current => ({ ...current, project_id: projects[0].id, brand_ids: projects[0].brand_ids }));
+    }
+    if (!periodForm.project_id && projects[0]) {
+      setPeriodForm(current => ({ ...current, project_id: projects[0].id }));
     }
   }, [projects, campaignForm.project_id]);
 
@@ -863,7 +877,9 @@ const PortfolioView = ({ portfolio, selectedProjectId, onSelectProject, onPortfo
         setBrandForm({ name: '', code: '' });
       } else if (stage === 'project') {
         next = await createProject({ ...projectForm, description: projectForm.description || null });
-        setProjectForm({ name: '', description: '', brand_ids: [] });
+        setProjectForm({ name: '', description: '', brand_ids: [], reporting_mode: 'monthly' });
+      } else if (stage === 'period') {
+        next = await createPeriod(periodForm);
       } else {
         next = await createCampaign(campaignForm);
         setCampaignForm(current => ({ ...current, source_account_id: '', source_campaign_id: '', name: '' }));
@@ -878,26 +894,100 @@ const PortfolioView = ({ portfolio, selectedProjectId, onSelectProject, onPortfo
 
   const selectedCampaignProject = projects.find(project => project.id === campaignForm.project_id);
   const eligibleBrands = brands.filter(brand => selectedCampaignProject?.brand_ids.includes(brand.id));
+  const selectedBrand = brands.find(brand => brand.id === selectedBrandId) || null;
+  const brandProjects = selectedBrand ? projects.filter(project => project.brand_ids.includes(selectedBrand.id)) : [];
+  const openProject = projects.find(project => project.id === openProjectId) || null;
+  const openProjectPeriods = openProject ? periods.filter(period => period.project_id === openProject.id) : [];
+  const openProjectCampaigns = openProject ? campaigns.filter(campaign => campaign.project_id === openProject.id) : [];
+  const selectedPeriod = openProjectPeriods.find(period => period.id === selectedPeriodId) || null;
+  const accountGroups = openProjectCampaigns.reduce((groups, campaign) => {
+    const key = `${campaign.source}:${campaign.source_account_id}`;
+    groups[key] ||= { source: campaign.source, accountId: campaign.source_account_id, campaigns: [] };
+    groups[key].campaigns.push(campaign);
+    return groups;
+  }, {});
+  const reportingModeLabel = { monthly: 'รายเดือน', campaign: 'ตาม Campaign', continuous: 'ต่อเนื่อง' };
+
+  const openBrand = brand => { setSelectedBrandId(brand.id); setOpenProjectId(null); setSelectedPeriodId(null); setSelectedCampaignIds([]); };
+  const openProjectDetail = project => { setOpenProjectId(project.id); setSelectedPeriodId(null); setSelectedCampaignIds([]); onSelectProject(project.id); };
+  const backToBrands = () => { setSelectedBrandId(null); setOpenProjectId(null); setSelectedPeriodId(null); setSelectedCampaignIds([]); };
+  const backToProjects = () => { setOpenProjectId(null); setSelectedPeriodId(null); setSelectedCampaignIds([]); };
+  const choosePeriod = period => {
+    setSelectedPeriodId(period.id);
+    setSelectedCampaignIds(openProjectCampaigns.map(campaign => campaign.id));
+  };
+  const toggleCampaign = campaignId => setSelectedCampaignIds(current => current.includes(campaignId) ? current.filter(id => id !== campaignId) : [...current, campaignId]);
 
   if (portfolio.loading) return <div className="loading-state"><LoaderCircle size={18} /> กำลังอ่านโครงสร้าง workspace...</div>;
   if (portfolio.error) return <div className="error-state"><AlertCircle size={18} /><div><strong>อ่าน Portfolio ไม่สำเร็จ</strong><span>{portfolio.error}</span></div></div>;
 
   return (
-    <section className="portfolio-view" aria-labelledby="portfolio-title">
+    <section className="portfolio-view brand-first" aria-labelledby="portfolio-title">
       <div className="surface-heading">
         <div>
-          <h1 id="portfolio-title">Brands & projects</h1>
-          <p>จัดโครงงานให้ชัดก่อนเลือกบัญชีและ Campaign ข้อมูลที่ผูกแล้วจะใช้เป็นขอบเขตของการนำเข้า วิเคราะห์ และบันทึกประกอบรายงาน</p>
+          <h1 id="portfolio-title">{openProject ? openProject.name : selectedBrand ? selectedBrand.name : 'Brand dashboard'}</h1>
+          <p>{openProject ? 'เลือกรอบรายงานและตรวจว่าข้อมูลมาจากบัญชีหรือ Campaign ใด ก่อนเข้าสู่การวิเคราะห์' : selectedBrand ? 'เลือก Project ของแบรนด์นี้ โดย Project หนึ่งสามารถทำงานร่วมกับหลายแบรนด์ได้' : 'เริ่มจากแบรนด์ แล้วไล่ลงไปยัง Project, รอบรายงาน และ Campaign จากหลายบัญชี'}</p>
         </div>
-        <div className="portfolio-counts" aria-label="Portfolio totals"><span>{brands.length} brands</span><span>{projects.length} projects</span><span>{campaigns.length} campaigns</span></div>
+        <div className="portfolio-counts" aria-label="Portfolio totals"><span>{brands.length} brands</span><span>{projects.length} projects</span><span>{periods.length} periods</span><span>{new Set(campaigns.map(item => `${item.source}:${item.source_account_id}`)).size} accounts</span></div>
       </div>
 
-      <div className="portfolio-layout">
+      {(selectedBrand || openProject) && <nav className="portfolio-breadcrumb" aria-label="Portfolio hierarchy"><button type="button" onClick={backToBrands}>Brands</button><ChevronRight size={13} />{selectedBrand && <button type="button" onClick={backToProjects}>{selectedBrand.name}</button>}{openProject && <><ChevronRight size={13} /><span>{openProject.name}</span></>}</nav>}
+
+      <div className="portfolio-home-layout">
+        <div className="portfolio-browser">
+          {!selectedBrand && !openProject && (
+            !brands.length ? <div className="portfolio-empty"><FolderKanban size={24} /><strong>ยังไม่มี Brand</strong><span>เพิ่ม Brand แรกจากแผงด้านขวา แล้วระบบจะใช้เป็นหน้าเริ่มต้นของ Workspace</span></div> : <div className="brand-card-grid">{brands.map((brand, index) => {
+              const relatedProjects = projects.filter(project => project.brand_ids.includes(brand.id));
+              const relatedProjectIds = new Set(relatedProjects.map(project => project.id));
+              const relatedPeriods = periods.filter(period => relatedProjectIds.has(period.project_id));
+              const relatedCampaigns = campaigns.filter(campaign => campaign.brand_ids.includes(brand.id));
+              const accounts = new Set(relatedCampaigns.map(campaign => `${campaign.source}:${campaign.source_account_id}`));
+              return <button className="brand-card" type="button" key={brand.id} onClick={() => openBrand(brand)}>
+                <span className="brand-card-index">{String(index + 1).padStart(2, '0')}</span>
+                <span className="brand-card-head"><strong>{brand.name}</strong><small>{brand.code || 'ไม่มีรหัสย่อ'}</small></span>
+                <span className="brand-card-stats"><span><strong>{relatedProjects.length}</strong> Projects</span><span><strong>{relatedPeriods.length}</strong> Periods</span><span><strong>{accounts.size}</strong> Accounts</span></span>
+                <span className="brand-card-action">เปิดพื้นที่แบรนด์ <ChevronRight size={15} /></span>
+              </button>;
+            })}</div>
+          )}
+
+          {selectedBrand && !openProject && <>
+            <button className="back-action" type="button" onClick={backToBrands}><ArrowLeft size={15} /> กลับไปทุกแบรนด์</button>
+            {!brandProjects.length ? <div className="portfolio-empty"><FolderKanban size={24} /><strong>แบรนด์นี้ยังไม่มี Project</strong><span>เลือกแท็บ Project ทางขวาและเพิ่มแบรนด์นี้เข้าไปใน Project ใหม่</span></div> : <div className="project-card-list">{brandProjects.map(project => {
+              const projectPeriods = periods.filter(period => period.project_id === project.id);
+              const projectCampaigns = campaigns.filter(campaign => campaign.project_id === project.id);
+              const projectAccounts = new Set(projectCampaigns.map(campaign => `${campaign.source}:${campaign.source_account_id}`));
+              const projectBrands = brands.filter(brand => project.brand_ids.includes(brand.id));
+              return <button className={`project-card ${selectedProjectId === project.id ? 'selected' : ''}`} type="button" key={project.id} onClick={() => openProjectDetail(project)}>
+                <span className="project-card-main"><strong>{project.name}</strong><small>{project.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</small><span>{projectBrands.map(brand => brand.name).join(' · ')}</span></span>
+                <span className="project-mode"><CalendarRange size={15} /> {reportingModeLabel[project.reporting_mode]}</span>
+                <span className="project-card-stats"><span><strong>{projectPeriods.length}</strong> รอบรายงาน</span><span><strong>{projectAccounts.size}</strong> บัญชี</span><span><strong>{projectCampaigns.length}</strong> Campaigns</span></span>
+                <ChevronRight size={17} />
+              </button>;
+            })}</div>}
+          </>}
+
+          {openProject && <>
+            <button className="back-action" type="button" onClick={backToProjects}><ArrowLeft size={15} /> กลับไป Projects</button>
+            <section className="project-workbench" aria-labelledby="periods-heading">
+              <div className="workbench-heading"><div><h2 id="periods-heading">รอบรายงาน</h2><p>แต่ละรอบใช้ช่วงวันที่ของตัวเอง แต่ยังเทียบย้อนหลังภายใน Project เดิมได้</p></div><span>{reportingModeLabel[openProject.reporting_mode]}</span></div>
+              {!openProjectPeriods.length ? <div className="compact-empty">ยังไม่มีรอบรายงาน · เพิ่ม Period จากแผงด้านขวา</div> : <div className="period-ledger">{openProjectPeriods.map(period => <button className={selectedPeriodId === period.id ? 'selected' : ''} type="button" key={period.id} onClick={() => choosePeriod(period)}><CalendarRange size={17} /><span><strong>{period.label}</strong><small>{period.date_from} — {period.date_to}</small></span><span className={`period-state ${period.status}`}>{period.status}</span>{selectedPeriodId === period.id ? <Check size={15} /> : <ChevronRight size={15} />}</button>)}</div>}
+            </section>
+
+            <section className="project-workbench" aria-labelledby="accounts-heading">
+              <div className="workbench-heading"><div><h2 id="accounts-heading">Data scope</h2><p>{selectedPeriod ? `เลือกบัญชีและ Campaign สำหรับ ${selectedPeriod.label}` : 'เลือก Period ก่อน แล้วจึงกำหนดบัญชีและ Campaign ที่จะใช้ในรายงาน'}</p></div><span>{selectedCampaignIds.length} selected</span></div>
+              {!selectedPeriod ? <div className="scope-locked"><CalendarRange size={18} /><span>รอเลือก Period จากขั้นก่อนหน้า</span></div> : !openProjectCampaigns.length ? <div className="compact-empty">ยังไม่มี Campaign binding · เพิ่มจากแผงด้านขวา</div> : <><div className="account-ledger">{Object.values(accountGroups).map(group => <div className="account-row" key={`${group.source}:${group.accountId}`}><div className="account-identity"><Cable size={17} /><span><strong>{group.source === 'facebook' ? 'Facebook Ads' : 'File import'}</strong><small>{group.accountId}</small></span></div><div className="account-campaigns selectable">{group.campaigns.map(campaign => <label key={campaign.id}><input type="checkbox" checked={selectedCampaignIds.includes(campaign.id)} onChange={() => toggleCampaign(campaign.id)} /><span>{campaign.name}<small>{campaign.source_campaign_id}</small></span></label>)}</div></div>)}</div><div className="scope-submit"><span>ระบบจะส่ง Project, Period และ {selectedCampaignIds.length} Campaigns ไปตรวจที่ backend</span><button className="primary-action" type="button" disabled={!selectedCampaignIds.length} onClick={() => onOpenReport({ since: selectedPeriod.date_from, until: selectedPeriod.date_to, projectId: openProject.id, periodId: selectedPeriod.id, campaignIds: selectedCampaignIds })}><BarChart3 size={16} /> เปิดรายงานตาม scope</button></div></>}
+            </section>
+
+            <section className="future-connectors" aria-label="Future advertising connectors"><div><strong>Google Ads</strong><span>ใช้ Account → Campaign → canonical metrics ชุดเดียวกัน</span><small>Planned</small></div><div><strong>TikTok Ads</strong><span>ใช้ Advertiser Account → Campaign → canonical metrics ชุดเดียวกัน</span><small>Planned</small></div></section>
+          </>}
+        </div>
+
         <aside className="portfolio-setup" aria-labelledby="portfolio-setup-title">
           <div className="panel-heading compact"><div><h2 id="portfolio-setup-title">เพิ่มขอบเขตงาน</h2><p>สร้างตามลำดับ Brand → Project → Campaign</p></div></div>
           <div className="setup-tabs" role="tablist" aria-label="Portfolio setup steps">
-            {[['brand', 'Brand'], ['project', 'Project'], ['campaign', 'Campaign']].map(([id, label]) => (
-              <button key={id} type="button" role="tab" aria-selected={stage === id} className={stage === id ? 'active' : ''} onClick={() => { setStage(id); setFormError(null); }} disabled={(id === 'project' && !brands.length) || (id === 'campaign' && !projects.length)}>{label}</button>
+            {[['brand', 'Brand'], ['project', 'Project'], ['period', 'Period'], ['campaign', 'Campaign']].map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={stage === id} className={stage === id ? 'active' : ''} onClick={() => { setStage(id); setFormError(null); if (id === 'project' && selectedBrand) setProjectForm(current => ({ ...current, brand_ids: current.brand_ids.includes(selectedBrand.id) ? current.brand_ids : [...current.brand_ids, selectedBrand.id] })); if (id === 'period' && openProject) setPeriodForm(current => ({ ...current, project_id: openProject.id })); if (id === 'campaign' && openProject) setCampaignForm(current => ({ ...current, project_id: openProject.id, brand_ids: openProject.brand_ids })); }} disabled={(id === 'project' && !brands.length) || ((id === 'period' || id === 'campaign') && !projects.length)}>{label}</button>
             ))}
           </div>
 
@@ -908,8 +998,15 @@ const PortfolioView = ({ portfolio, selectedProjectId, onSelectProject, onPortfo
             </>}
             {stage === 'project' && <>
               <label>ชื่อโปรเจกต์<input required maxLength="160" value={projectForm.name} onChange={event => setProjectForm({ ...projectForm, name: event.target.value })} placeholder="Q3 Campaign Review" /></label>
+              <label>รูปแบบรายงาน<select value={projectForm.reporting_mode} onChange={event => setProjectForm({ ...projectForm, reporting_mode: event.target.value })}><option value="monthly">รายเดือน</option><option value="campaign">ตาม Campaign</option><option value="continuous">ต่อเนื่อง</option></select></label>
               <fieldset><legend>แบรนด์ในโปรเจกต์</legend>{brands.map(brand => <label className="check-row" key={brand.id}><input type="checkbox" checked={projectForm.brand_ids.includes(brand.id)} onChange={() => setProjectForm({ ...projectForm, brand_ids: toggleId(projectForm.brand_ids, brand.id) })} /><span>{brand.name}</span></label>)}</fieldset>
               <label>รายละเอียด <span>ไม่บังคับ</span><textarea maxLength="1000" rows="3" value={projectForm.description} onChange={event => setProjectForm({ ...projectForm, description: event.target.value })} /></label>
+            </>}
+            {stage === 'period' && <>
+              <label>โปรเจกต์<select required value={periodForm.project_id} onChange={event => setPeriodForm({ ...periodForm, project_id: event.target.value })}><option value="">เลือกโปรเจกต์</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+              <label>ชื่อรอบรายงาน<input required maxLength="120" value={periodForm.label} onChange={event => setPeriodForm({ ...periodForm, label: event.target.value })} /></label>
+              <label>รูปแบบ<select value={periodForm.cadence} onChange={event => setPeriodForm({ ...periodForm, cadence: event.target.value })}><option value="monthly">รายเดือน</option><option value="custom">กำหนดเอง</option></select></label>
+              <div className="portfolio-date-pair"><label>ตั้งแต่<input required type="date" value={periodForm.date_from} max={periodForm.date_to} onChange={event => setPeriodForm({ ...periodForm, date_from: event.target.value })} /></label><label>ถึง<input required type="date" value={periodForm.date_to} min={periodForm.date_from} onChange={event => setPeriodForm({ ...periodForm, date_to: event.target.value })} /></label></div>
             </>}
             {stage === 'campaign' && <>
               <label>โปรเจกต์<select required value={campaignForm.project_id} onChange={event => { const project = projects.find(item => item.id === event.target.value); setCampaignForm({ ...campaignForm, project_id: event.target.value, brand_ids: project?.brand_ids || [] }); }}><option value="">เลือกโปรเจกต์</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
@@ -923,20 +1020,6 @@ const PortfolioView = ({ portfolio, selectedProjectId, onSelectProject, onPortfo
             <button className="primary-action" type="submit" disabled={saving || (stage === 'project' && !projectForm.brand_ids.length) || (stage === 'campaign' && !campaignForm.brand_ids.length)}>{saving ? <LoaderCircle className="button-spinner" size={16} /> : <Plus size={16} />} เพิ่ม {stage}</button>
           </form>
         </aside>
-
-        <div className="portfolio-ledger">
-          <div className="ledger-heading"><div><h2>Project registry</h2><p>เลือก Project เพื่อกำหนดบริบทให้รายงานและ Working notes</p></div></div>
-          {!projects.length ? <div className="portfolio-empty"><FolderKanban size={24} /><strong>ยังไม่มี Project</strong><span>เริ่มจากเพิ่ม Brand ทางซ้าย แล้วจึงสร้าง Project แรก</span></div> : projects.map(project => {
-            const projectBrands = brands.filter(brand => project.brand_ids.includes(brand.id));
-            const projectCampaigns = campaigns.filter(campaign => campaign.project_id === project.id);
-            return <button key={project.id} className={`project-row ${selectedProjectId === project.id ? 'selected' : ''}`} type="button" onClick={() => onSelectProject(project.id)}>
-              <span className="project-row-main"><strong>{project.name}</strong><small>{project.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</small></span>
-              <span className="project-row-brands">{projectBrands.map(brand => brand.name).join(' · ')}</span>
-              <span className="project-row-count"><strong>{projectCampaigns.length}</strong><small>Campaigns</small></span>
-              <ChevronRight size={16} />
-            </button>;
-          })}
-        </div>
       </div>
     </section>
   );
@@ -1067,7 +1150,7 @@ const LoginGate = ({ loading, error, onSubmit }) => {
 
 // ============ MAIN APP ============
 export default function Dashboard() {
-  const [view, setView] = useState('report');
+  const [view, setView] = useState('portfolio');
   const [refreshKey, setRefreshKey] = useState(0);
   const [tier, setTier] = useState('overview');
   const [selectedPost, setSelectedPost] = useState(null);
@@ -1183,6 +1266,13 @@ export default function Dashboard() {
     setPeriodApplied(nextPeriod);
     setRefreshKey(key => key + 1);
   };
+  const handleOpenReportPeriod = nextPeriod => {
+    setPeriodDraft(nextPeriod);
+    setPeriodApplied(nextPeriod);
+    setSelectedPost(null);
+    setTier('overview');
+    setView('report');
+  };
   const focusAnalysisComment = () => {
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     document.getElementById('report-elements')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
@@ -1246,7 +1336,7 @@ export default function Dashboard() {
             <div className="workspace-title">{viewTitles[view]}</div>
           </div>
           <div className="topbar-actions">
-            {portfolio.data?.projects.length > 0 ? <label className="project-switcher"><span>Project</span><select value={selectedProjectId || ''} onChange={event => setSelectedProjectId(event.target.value)}>{portfolio.data.projects.filter(project => project.status === 'active').map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label> : <button className="secondary-action" type="button" onClick={() => setView('portfolio')}><FolderKanban size={15} /> ตั้งค่า Project</button>}
+            {view !== 'portfolio' && (portfolio.data?.projects.length > 0 ? <label className="project-switcher"><span>Project</span><select value={selectedProjectId || ''} onChange={event => setSelectedProjectId(event.target.value)}>{portfolio.data.projects.filter(project => project.status === 'active').map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label> : <button className="secondary-action" type="button" onClick={() => setView('portfolio')}><FolderKanban size={15} /> ตั้งค่า Project</button>)}
             <button className="data-health-button" onClick={() => setView('sources')}>
               <span className={`health-indicator ${error ? 'error' : ''}`}></span>
               {error ? 'Data source error' : data?.demo ? 'Demo source active' : 'Sources healthy'}
@@ -1256,7 +1346,7 @@ export default function Dashboard() {
 
         <div className="workspace-content">
           {view === 'portfolio' ? (
-            <PortfolioView portfolio={portfolio} selectedProjectId={selectedProjectId} onSelectProject={setSelectedProjectId} onPortfolioChange={handlePortfolioChange} onSessionExpiry={handleSessionExpiry} />
+            <PortfolioView portfolio={portfolio} selectedProjectId={selectedProjectId} onSelectProject={setSelectedProjectId} onPortfolioChange={handlePortfolioChange} onSessionExpiry={handleSessionExpiry} onOpenReport={handleOpenReportPeriod} />
           ) : view === 'sources' ? (
             <DataSourcesView
               loading={loading}
@@ -1290,6 +1380,7 @@ export default function Dashboard() {
               </div>
 
               <PeriodControl value={periodDraft} onChange={setPeriodDraft} onApply={handlePeriodApply} loading={loading} />
+              {data?.scope && <div className="scope-evidence" role="status"><ShieldCheck size={16} /><div><strong>{data.scope.project_name} · {data.scope.period_label}</strong><span>{data.scope.campaigns.length} Campaigns จาก {new Set(data.scope.campaigns.map(campaign => `${campaign.source}:${campaign.source_account_id}`)).size} accounts ผ่าน backend validation</span></div></div>}
 
               <nav className="tier-nav" aria-label="Report depth">
                 {tier !== 'overview' && (

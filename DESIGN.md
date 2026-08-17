@@ -92,6 +92,16 @@ components:
     textColor: "{colors.primary-teal}"
     rounded: "{rounded.pill}"
     padding: "4px 7px"
+  brand-card:
+    backgroundColor: "{colors.surface-white}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.xl}"
+    padding: "20px"
+  report-scope:
+    backgroundColor: "{colors.surface-white}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.xl}"
+    padding: "17px 18px"
 ---
 
 # Design System: Report Analysis
@@ -102,7 +112,7 @@ components:
 
 Report Analysis feels like a well-kept working desk for evidence: warm stone surrounds quiet white work surfaces, ink typography carries the analysis, and restrained teal identifies trusted state and direction. The system is compact and serious without becoming cold; hierarchy, rhythm, and source clarity do the expressive work.
 
-The visual system extends the incumbent three-tier report rather than reframing it. Workspace chrome stays quiet, analytical content remains dominant, and supplemental-file workflows are visibly adjacent to—not blended with—API-backed evidence.
+The visual system extends the incumbent three-tier report rather than reframing it. Workspace chrome stays quiet, analytical content remains dominant, and supplemental-file workflows are visibly adjacent to—not blended with—API-backed evidence. The operating home begins with data-bearing Brand cards, then progressively narrows through Project, Report Period, and Data scope before a report can open.
 
 **Key Characteristics:**
 
@@ -110,6 +120,8 @@ The visual system extends the incumbent three-tier report rather than reframing 
 - Compact IBM Plex typography with monospaced treatment reserved for data and identifiers.
 - Restrained teal for active, ready, positive, and directional states.
 - Fine stone borders, selective elevation, and progressive disclosure instead of ornamental decoration.
+- Brand-first navigation whose cards expose useful portfolio counts before asking the user to drill in.
+- Explicit scope gates and backend-validated evidence before scoped analysis is treated as ready.
 
 ## Colors
 
@@ -171,11 +183,15 @@ The palette combines warm mineral neutrals with a single trusted teal voice; sem
 
 The desktop shell uses a fixed `236px` workspace rail and a fluid main column. Content is centered to a maximum of `1180px`, with `30px` horizontal working margins and a recurring compact rhythm of `8px`, `12px`, `16px`, `20px`, and `28px`. The report hierarchy stays linear: utility context, page title and mode, tier path, then evidence.
 
+The portfolio home uses a primary browser column plus a secondary `330px` setup panel. The browser follows Brand → Project → Report Period → Data scope: Brand cards expose Project, Period, and Account counts; Project rows retain reporting mode and scope counts; the Period ledger must resolve before account and Campaign selectors appear. The setup panel supports this path but never becomes the visual starting point.
+
 Cards use responsive grids rather than fixed canvases. At `1120px`, the rail becomes a horizontal navigation strip, source panels stack, and KPI grids reduce to two columns. At `700px`, outer padding tightens to `14px`, headings stack, navigation labels collapse, and dense analytical grids preserve two-column comparison where legibility allows. At `430px`, source health becomes a single column and the smallest report grids stay deliberately compact rather than turning into oversized mobile cards.
 
 **The Report Leads Rule.** Workspace chrome frames the analysis but never competes with the title, mode control, tier path, or metrics.
 
 **The Progressive Density Rule.** Preserve the Overview → Ads vs Organic → Post deep-dive path; reveal detail through navigation rather than placing every metric in one view.
+
+**The Scope Before Evidence Rule.** Preserve Brand → Project → Report Period → Data scope as a progressive chain. A Period unlocks account and Campaign selection, at least one Campaign unlocks the report action, and the resulting report surfaces backend-validated scope proof.
 
 ## Elevation & Depth
 
@@ -186,6 +202,7 @@ The system is flat by default and uses tonal layering plus hairline borders for 
 - **Selected Control** (`0 3px 10px rgba(41, 37, 36, 0.06–0.07)`): Active mode and tier controls.
 - **Active Navigation** (`0 5px 14px rgba(41, 37, 36, 0.06)`): The selected workspace destination.
 - **Source Authority** (`0 10px 24px rgba(28, 25, 23, 0.12)`): Source-health band only.
+- **Portfolio Affordance** (`0 10px 24px rgba(28, 25, 23, 0.08)`): Hover-only lift for data-bearing Brand cards.
 
 ### Named Rules
 
@@ -250,6 +267,22 @@ The panel becomes a faint teal-tinted surface only after a valid connection. Per
 
 **The Lifecycle Before Detail Rule.** A connector must make its current state and next valid action clear before presenting resource metadata or downstream import choices.
 
+### Brand Portfolio Browser
+
+Brand cards are the operating homepage, not decorative shortcuts. Each card carries the Brand identity plus live Project, Period, and Account counts, uses the dark index tile as a compact locator, and ends with a directional teal action. Selecting a Brand reveals its Projects; selecting a Project reveals the Report Period ledger, then Data scope.
+
+The Project workbench keeps Report Period and Data scope in separate bordered panels. Data scope remains visibly locked until a Period is selected. Campaign checkboxes are grouped under their source account, the report action stays disabled at zero selected Campaigns, and a successful report displays Project, Period, Campaign, and Account evidence returned by backend validation.
+
+The creation panel remains a narrower secondary rail. Its Brand, Project, Period, and Campaign tabs may prefill the current context, but setup must not displace the portfolio browser or bypass the hierarchy.
+
+**The Brand Carries Evidence Rule.** A Brand entry earns homepage prominence by carrying useful portfolio counts and a clear next action; never reduce it to a logo tile or plain name.
+
+**The Gate in Sequence Rule.** Do not expose account or Campaign selection before a Report Period, and do not enable report creation before at least one Campaign is selected.
+
+### Future Provider Placards
+
+Future provider connectors use quiet dashed cards below the active scope workflow. They explain the intended Account → Campaign mapping without impersonating live controls, and every unavailable connector must carry the visible label **Planned**.
+
 ### Motion
 
 Report content settles over `380ms` with a short upward translation and blur release using `cubic-bezier(.16, 1, .3, 1)`. Ordinary state changes use `160ms ease-out`; loading uses a `900ms` linear spinner. Reduced-motion preference disables both report settling and spinner animation.
@@ -264,6 +297,9 @@ Report content settles over `380ms` with a short upward translation and blur rel
 - **Do** identify whether a metric comes from an API, file, manual input, or calculation.
 - **Do** keep provider identity, connection state, permission coverage, and the next valid action together in one connector lifecycle panel.
 - **Do** reduce secondary metadata before removing source identity, state, or analytical sequence on smaller screens.
+- **Do** begin portfolio navigation with data-bearing Brand cards, then preserve Brand → Project → Report Period → Data scope.
+- **Do** keep setup in the secondary rail and show backend-validated scope evidence on the resulting report.
+- **Do** label every unavailable future provider connector **Planned**.
 
 ### Don't:
 
@@ -273,3 +309,5 @@ Report content settles over `380ms` with a short upward translation and blur rel
 - **Don't** use dark Source Ink panels as ordinary decorative cards.
 - **Don't** add accent colors unless they encode a distinct data category or semantic state.
 - **Don't** replace fine borders and controlled whitespace with heavy shadows or oversized card spacing.
+- **Don't** reveal account or Campaign checkboxes before a Report Period is selected.
+- **Don't** enable a scoped report action with zero selected Campaigns or imply that frontend selection alone is validated evidence.

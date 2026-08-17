@@ -8,6 +8,9 @@ Authenticated workspace
   ├── Brand B
   └── Project
         ├── allowed brand_ids[]
+        ├── Report period
+        │     ├── date_from / date_to
+        │     └── cadence: monthly | custom
         └── Campaign binding
               ├── source: facebook | file
               ├── source_account_id
@@ -32,6 +35,7 @@ Project เป็น reporting boundary หลักและรองรับ�
 - `PATCH /api/portfolio/workspace`
 - `POST /api/portfolio/brands`
 - `POST /api/portfolio/projects`
+- `POST /api/portfolio/periods`
 - `POST /api/portfolio/campaigns`
 
 ทุก mutation คืน snapshot ล่าสุดเพื่อให้ frontend เปลี่ยน context โดยไม่ต้องรวม state จากหลาย response

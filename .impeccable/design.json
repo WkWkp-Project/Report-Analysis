@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-13T16:45:00+07:00",
+  "generatedAt": "2026-08-17T15:36:04+07:00",
   "title": "Design System: Report Analysis",
   "extensions": {
     "colorMeta": {
@@ -27,7 +27,8 @@
     "shadows": [
       { "name": "selected-control", "value": "0 3px 10px rgba(41, 37, 36, 0.07)", "purpose": "Selected segments and report tiers." },
       { "name": "active-navigation", "value": "0 5px 14px rgba(41, 37, 36, 0.06)", "purpose": "Current workspace destination." },
-      { "name": "source-authority", "value": "0 10px 24px rgba(28, 25, 23, 0.12)", "purpose": "Source-health band only." }
+      { "name": "source-authority", "value": "0 10px 24px rgba(28, 25, 23, 0.12)", "purpose": "Source-health band only." },
+      { "name": "portfolio-affordance", "value": "0 10px 24px rgba(28, 25, 23, 0.08)", "purpose": "Hover-only lift for data-bearing Brand cards." }
     ],
     "motion": [
       { "name": "state-change", "value": "160ms ease-out", "purpose": "Hover and low-stakes color or border changes." },
@@ -87,19 +88,20 @@
       "css": ".ds-evidence-card{width:220px;padding:14px 16px;border:.5px solid var(--line,#e7e5e4);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#1c1917);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif}.ds-evidence-label{color:#78716c;font-size:10px;letter-spacing:.5px;text-transform:uppercase}.ds-evidence-card strong{display:block;margin-top:2px;font:500 16px/1.4 \"IBM Plex Mono\",monospace}.ds-evidence-card p{margin:4px 0 0;color:#78716c;font-size:10px;line-height:1.5}"
     },
     {
-      "name": "Ready Status Chip",
-      "kind": "chip",
-      "refersTo": "status-ready",
-      "description": "Compact availability state for metric coverage.",
-      "html": "<span class=\"ds-status-ready\">Ready</span>",
-      "css": ".ds-status-ready{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:var(--teal-soft,#e1f5ee);color:#0b645d;font:500 9px/1.4 \"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;white-space:nowrap}"
+      "name": "Brand Portfolio Card",
+      "kind": "card",
+      "refersTo": "brand-card",
+      "description": "Data-bearing operating-home entry that identifies a Brand and exposes its Project, Period, and Account counts.",
+      "html": "<button class=\"ds-brand-card\" type=\"button\"><span class=\"ds-brand-index\">01</span><span class=\"ds-brand-head\"><strong>Northwind</strong><small>NW</small></span><span class=\"ds-brand-stats\"><span><b>3</b>Projects</span><span><b>8</b>Periods</span><span><b>4</b>Accounts</span></span><span class=\"ds-brand-action\">Open brand workspace <b>›</b></span></button>",
+      "css": ".ds-brand-card{width:340px;min-height:190px;display:grid;grid-template-columns:38px minmax(0,1fr);grid-template-rows:auto 1fr auto;gap:16px 12px;padding:20px;border:1px solid var(--line,#e7e5e4);border-radius:14px;background:var(--surface,#fff);color:var(--ink,#1c1917);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;text-align:left;cursor:pointer;transition:border-color 160ms ease-out,transform 160ms ease-out,box-shadow 160ms ease-out}.ds-brand-card:hover{transform:translateY(-2px);border-color:#a7cfc7;box-shadow:0 10px 24px rgba(28,25,23,.08)}.ds-brand-card:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:2px}.ds-brand-index{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:#1f2927;color:#d6ebe6;font:500 10px/1 \"IBM Plex Mono\",monospace}.ds-brand-head strong,.ds-brand-head small{display:block}.ds-brand-head strong{font-size:17px;font-weight:600;letter-spacing:-.02em}.ds-brand-head small{margin-top:4px;color:var(--muted,#68625d);font-size:10px}.ds-brand-stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);align-self:end;border-top:1px solid #efede9;border-bottom:1px solid #efede9}.ds-brand-stats span{padding:10px 7px;border-left:1px solid #efede9;color:var(--muted,#68625d);font-size:9px}.ds-brand-stats span:first-child{padding-left:0;border-left:0}.ds-brand-stats b{display:block;margin-bottom:3px;color:var(--ink,#1c1917);font:500 13px/1.3 \"IBM Plex Mono\",monospace}.ds-brand-action{grid-column:1/-1;display:flex;justify-content:space-between;color:var(--teal,#0f766e);font-size:11px;font-weight:500}"
     },
     {
-      "name": "File Upload Zone",
-      "kind": "input",
-      "description": "Explicit supplemental-data entry point, separate from API-backed evidence.",
-      "html": "<label class=\"ds-upload-zone\" tabindex=\"0\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 16V4M7 9l5-5 5 5M5 20h14\"/></svg><strong>Choose a file</strong><span>.xlsx, .xls, or .csv · confirm mapping before merge</span></label>",
-      "css": ".ds-upload-zone{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px;border:1px dashed #b9b4ac;border-radius:12px;background:#faf9f7;color:var(--ink,#1c1917);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;text-align:center;cursor:pointer;transition:border-color 160ms ease-out,background-color 160ms ease-out}.ds-upload-zone svg{width:42px;height:42px;padding:10px;border-radius:12px;background:var(--teal-soft,#e1f5ee);color:var(--teal,#0f766e);fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-upload-zone strong{font-size:12px}.ds-upload-zone span{max-width:340px;color:var(--muted,#68625d);font-size:10px;line-height:1.55}.ds-upload-zone:hover{border-color:var(--teal,#0f766e);background:#f3faf8}.ds-upload-zone:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:2px}"
+      "name": "Scoped Report Workbench",
+      "kind": "custom",
+      "refersTo": "report-scope",
+      "description": "Progressive Report Period and Data scope gate with account-grouped Campaign selection and a disabled-until-valid report action.",
+      "html": "<section class=\"ds-scope-workbench\"><header><div><strong>Data scope</strong><small>March 2026 · backend validation required</small></div><span>2 selected</span></header><div class=\"ds-account\"><div><b>Facebook Ads</b><small>act_104823</small></div><label><input type=\"checkbox\" checked> Launch campaign</label><label><input type=\"checkbox\" checked> Retargeting</label></div><footer><span>Project, Period, and Campaigns will be validated on the backend.</span><button type=\"button\">Open scoped report</button></footer><aside><strong>Google Ads</strong><span>Account → Campaign</span><small>Planned</small></aside></section>",
+      "css": ".ds-scope-workbench{width:560px;border:1px solid var(--line,#e7e5e4);border-radius:14px;background:var(--surface,#fff);color:var(--ink,#1c1917);font-family:\"IBM Plex Sans Thai\",\"IBM Plex Sans\",sans-serif;overflow:hidden}.ds-scope-workbench header{display:flex;align-items:flex-start;justify-content:space-between;padding:17px 18px;border-bottom:1px solid #efede9}.ds-scope-workbench header strong,.ds-scope-workbench header small{display:block}.ds-scope-workbench header strong{font-size:14px}.ds-scope-workbench header small{margin-top:4px;color:var(--muted,#68625d);font-size:10px}.ds-scope-workbench header>span{padding:4px 7px;border-radius:7px;background:#f0eee9;color:var(--muted,#68625d);font-size:9px}.ds-account{display:grid;grid-template-columns:minmax(140px,.7fr) repeat(2,minmax(0,1fr));gap:8px;padding:14px 18px}.ds-account div b,.ds-account div small{display:block}.ds-account div b{font-size:11px}.ds-account div small{margin-top:3px;color:var(--muted,#68625d);font:400 9px/1.4 \"IBM Plex Mono\",monospace}.ds-account label{display:flex;gap:7px;padding:7px 8px;border:1px solid #94cfc3;border-radius:8px;background:var(--teal-soft,#e1f5ee);color:#0b645d;font-size:10px}.ds-account input{accent-color:var(--teal,#0f766e)}.ds-scope-workbench footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 18px;border-top:1px solid #e7efec;background:#f6fbf9}.ds-scope-workbench footer span{max-width:38ch;color:#52615e;font-size:10px;line-height:1.5}.ds-scope-workbench footer button{min-height:40px;padding:9px 14px;border:0;border-radius:10px;background:var(--teal,#0f766e);color:#fff;font-size:11px;font-weight:500;cursor:pointer}.ds-scope-workbench footer button:hover{background:#0b655f}.ds-scope-workbench footer button:focus-visible{outline:3px solid rgba(15,118,110,.22);outline-offset:2px}.ds-scope-workbench aside{position:relative;margin:14px;padding:12px 64px 12px 14px;border:1px dashed #c9c5be;border-radius:12px;color:var(--muted,#68625d)}.ds-scope-workbench aside strong,.ds-scope-workbench aside span{display:block}.ds-scope-workbench aside strong{color:#494440;font-size:11px}.ds-scope-workbench aside span{margin-top:3px;font-size:9px}.ds-scope-workbench aside small{position:absolute;top:12px;right:12px;color:#817a74;font-size:8px;text-transform:uppercase}@media(max-width:600px){.ds-scope-workbench{width:100%}.ds-account{grid-template-columns:1fr}.ds-scope-workbench footer{align-items:stretch;flex-direction:column}.ds-scope-workbench footer button{width:100%}}"
     },
     {
       "name": "Source Health Band",
@@ -118,12 +120,14 @@
   ],
   "narrative": {
     "northStar": "The Analyst's Field Desk",
-    "overview": "Report Analysis feels like a well-kept working desk for evidence: warm stone surrounds quiet white work surfaces, ink typography carries the analysis, and restrained teal identifies trusted state and direction. The system is compact and serious without becoming cold; hierarchy, rhythm, and source clarity do the expressive work.\n\nThe visual system extends the incumbent three-tier report rather than reframing it. Workspace chrome stays quiet, analytical content remains dominant, and supplemental-file workflows are visibly adjacent to—not blended with—API-backed evidence.",
+    "overview": "Report Analysis feels like a well-kept working desk for evidence: warm stone surrounds quiet white work surfaces, ink typography carries the analysis, and restrained teal identifies trusted state and direction. The system is compact and serious without becoming cold; hierarchy, rhythm, and source clarity do the expressive work.\n\nThe visual system extends the incumbent three-tier report rather than reframing it. Workspace chrome stays quiet, analytical content remains dominant, and supplemental-file workflows are visibly adjacent to—not blended with—API-backed evidence. The operating home begins with data-bearing Brand cards, then progressively narrows through Project, Report Period, and Data scope before a report can open.",
     "keyCharacteristics": [
       "Warm, low-contrast workspace framing around crisp white analytical surfaces.",
       "Compact IBM Plex typography with monospaced treatment reserved for data and identifiers.",
       "Restrained teal for active, ready, positive, and directional states.",
-      "Fine stone borders, selective elevation, and progressive disclosure instead of ornamental decoration."
+      "Fine stone borders, selective elevation, and progressive disclosure instead of ornamental decoration.",
+      "Brand-first navigation whose cards expose useful portfolio counts before asking the user to drill in.",
+      "Explicit scope gates and backend-validated evidence before scoped analysis is treated as ready."
     ],
     "rules": [
       { "name": "The One Trusted Voice Rule", "body": "Teal is the only global accent; reserve it for state, direction, and evidence that is ready to act on.", "section": "colors" },
@@ -133,9 +137,12 @@
       { "name": "The Compact, Not Cramped Rule", "body": "Small labels rely on weight, spacing, and contrast; do not compensate with dense all-caps paragraphs.", "section": "typography" },
       { "name": "The Report Leads Rule", "body": "Workspace chrome frames the analysis but never competes with the title, mode control, tier path, or metrics.", "section": "layout" },
       { "name": "The Progressive Density Rule", "body": "Preserve the Overview → Ads vs Organic → Post deep-dive path; reveal detail through navigation rather than placing every metric in one view.", "section": "layout" },
+      { "name": "The Scope Before Evidence Rule", "body": "Preserve Brand → Project → Report Period → Data scope as a progressive chain. A Period unlocks account and Campaign selection, at least one Campaign unlocks the report action, and the resulting report surfaces backend-validated scope proof.", "section": "layout" },
       { "name": "The Flat-by-Default Rule", "body": "Cards and panels rest on borders and tonal contrast; elevation marks selection or source authority, not decoration.", "section": "elevation" },
       { "name": "The Radius Follows Scale Rule", "body": "Larger containing surfaces receive larger corners, while data cells and tier markers remain tighter and more precise.", "section": "shapes" },
-      { "name": "The Lifecycle Before Detail Rule", "body": "A connector must make its current state and next valid action clear before presenting resource metadata or downstream import choices.", "section": "components" }
+      { "name": "The Lifecycle Before Detail Rule", "body": "A connector must make its current state and next valid action clear before presenting resource metadata or downstream import choices.", "section": "components" },
+      { "name": "The Brand Carries Evidence Rule", "body": "A Brand entry earns homepage prominence by carrying useful portfolio counts and a clear next action; never reduce it to a logo tile or plain name.", "section": "components" },
+      { "name": "The Gate in Sequence Rule", "body": "Do not expose account or Campaign selection before a Report Period, and do not enable report creation before at least one Campaign is selected.", "section": "components" }
     ],
     "dos": [
       "**Do** keep analytical evidence visually dominant over workspace chrome.",
@@ -143,7 +150,10 @@
       "**Do** preserve IBM Plex Mono for numbers, ranges, grades, and identifiers.",
       "**Do** identify whether a metric comes from an API, file, manual input, or calculation.",
       "**Do** keep provider identity, connection state, permission coverage, and the next valid action together in one connector lifecycle panel.",
-      "**Do** reduce secondary metadata before removing source identity, state, or analytical sequence on smaller screens."
+      "**Do** reduce secondary metadata before removing source identity, state, or analytical sequence on smaller screens.",
+      "**Do** begin portfolio navigation with data-bearing Brand cards, then preserve Brand → Project → Report Period → Data scope.",
+      "**Do** keep setup in the secondary rail and show backend-validated scope evidence on the resulting report.",
+      "**Do** label every unavailable future provider connector **Planned**."
     ],
     "donts": [
       "**Don't** flatten the three-tier report into a single dense dashboard.",
@@ -151,7 +161,9 @@
       "**Don't** expose tokens, secrets, or credential-like values in connector UI; show only safe configuration keys and sanitized account metadata.",
       "**Don't** use dark Source Ink panels as ordinary decorative cards.",
       "**Don't** add accent colors unless they encode a distinct data category or semantic state.",
-      "**Don't** replace fine borders and controlled whitespace with heavy shadows or oversized card spacing."
+      "**Don't** replace fine borders and controlled whitespace with heavy shadows or oversized card spacing.",
+      "**Don't** reveal account or Campaign checkboxes before a Report Period is selected.",
+      "**Don't** enable a scoped report action with zero selected Campaigns or imply that frontend selection alone is validated evidence."
     ]
   }
 }

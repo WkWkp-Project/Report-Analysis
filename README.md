@@ -164,6 +164,15 @@ Claude จะอ่านโค้ด, แก้ไขไฟล์, รัน te
 - [PORTFOLIO.md](PORTFOLIO.md) — Workspace, Brand, Project และ Campaign reporting scope
 - [DATA_IMPORT.md](DATA_IMPORT.md) — workflow แบบ gated stages ตั้งแต่เลือกช่วงข้อมูลจนพร้อมให้ AI วิเคราะห์
 - [FACEBOOK_CONNECTION.md](FACEBOOK_CONNECTION.md) — ตั้งค่า Meta OAuth, การเก็บ token และ production callback
+- [CONNECTOR_ROADMAP.md](CONNECTOR_ROADMAP.md) — โครงหลายบัญชีและเส้นทางต่อ Google Ads/TikTok Ads
+
+สร้างข้อมูลตัวอย่างสำหรับหน้า Brand dashboard ใน development ได้ด้วย:
+
+```bash
+python scripts/seed_demo_portfolio.py
+```
+
+คำสั่งจะไม่เขียนทับ Portfolio ที่มีข้อมูลอยู่แล้ว และไฟล์ runtime ใน `data/` ไม่ถูก commit ขึ้น repository
 
 ### Production แบบ container เดียว
 

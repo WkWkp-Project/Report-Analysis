@@ -6,7 +6,7 @@ import json
 import os
 import tempfile
 import threading
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
@@ -39,6 +39,7 @@ class Project(StrictModel):
     name: str = Field(min_length=1, max_length=160)
     brand_ids: list[str] = Field(min_length=1, max_length=50)
     description: str | None = Field(default=None, max_length=1000)
+    reporting_mode: Literal["monthly", "campaign", "continuous"] = "monthly"
     status: Literal["active", "archived"] = "active"
     created_at: str
 
@@ -54,11 +55,23 @@ class CampaignBinding(StrictModel):
     created_at: str
 
 
+class ReportPeriod(StrictModel):
+    id: str
+    project_id: str
+    label: str = Field(min_length=1, max_length=120)
+    date_from: date
+    date_to: date
+    cadence: Literal["monthly", "custom"] = "monthly"
+    status: Literal["draft", "ready", "archived"] = "draft"
+    created_at: str
+
+
 class PortfolioSnapshot(StrictModel):
-    schema_version: int = 1
+    schema_version: int = 2
     workspace: WorkspaceProfile = Field(default_factory=WorkspaceProfile)
     brands: list[Brand] = Field(default_factory=list)
     projects: list[Project] = Field(default_factory=list)
+    periods: list[ReportPeriod] = Field(default_factory=list)
     campaigns: list[CampaignBinding] = Field(default_factory=list)
     updated_at: str | None = None
 
@@ -76,6 +89,7 @@ class ProjectCreate(StrictModel):
     name: str = Field(min_length=1, max_length=160)
     brand_ids: list[str] = Field(min_length=1, max_length=50)
     description: str | None = Field(default=None, max_length=1000)
+    reporting_mode: Literal["monthly", "campaign", "continuous"] = "monthly"
 
     @field_validator("brand_ids")
     @classmethod
@@ -101,6 +115,22 @@ class CampaignCreate(StrictModel):
         if not normalized:
             raise ValueError("select at least one brand")
         return normalized
+
+
+class ReportPeriodCreate(StrictModel):
+    project_id: str = Field(min_length=1, max_length=80)
+    label: str = Field(min_length=1, max_length=120)
+    date_from: date
+    date_to: date
+    cadence: Literal["monthly", "custom"] = "monthly"
+
+    @field_validator("date_to")
+    @classmethod
+    def valid_date_range(cls, value: date, info):
+        date_from = info.data.get("date_from")
+        if date_from and value < date_from:
+            raise ValueError("date_to must be on or after date_from")
+        return value
 
 
 class PortfolioStore:
@@ -155,6 +185,38 @@ class PortfolioStore:
                     name=payload.name,
                     brand_ids=payload.brand_ids,
                     description=payload.description,
+                    reporting_mode=payload.reporting_mode,
+                    created_at=_now(),
+                )
+            )
+            return self._save(snapshot)
+
+    def create_period(self, payload: ReportPeriodCreate) -> PortfolioSnapshot:
+        with self._lock:
+            snapshot = self._load()
+            if not any(project.id == payload.project_id for project in snapshot.projects):
+                raise PortfolioError("ไม่พบโปรเจกต์ที่เลือก")
+            duplicate = any(
+                period.project_id == payload.project_id
+                and (
+                    period.label.casefold() == payload.label.casefold()
+                    or (
+                        period.date_from == payload.date_from
+                        and period.date_to == payload.date_to
+                    )
+                )
+                for period in snapshot.periods
+            )
+            if duplicate:
+                raise PortfolioError("มีรอบรายงานนี้ในโปรเจกต์แล้ว")
+            snapshot.periods.append(
+                ReportPeriod(
+                    id=_new_id("rpd"),
+                    project_id=payload.project_id,
+                    label=payload.label,
+                    date_from=payload.date_from,
+                    date_to=payload.date_to,
+                    cadence=payload.cadence,
                     created_at=_now(),
                 )
             )
@@ -196,7 +258,11 @@ class PortfolioStore:
         if not self.path.exists():
             return PortfolioSnapshot()
         try:
-            return PortfolioSnapshot.model_validate_json(self.path.read_text(encoding="utf-8"))
+            snapshot = PortfolioSnapshot.model_validate_json(
+                self.path.read_text(encoding="utf-8")
+            )
+            snapshot.schema_version = 2
+            return snapshot
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise PortfolioError("อ่าน portfolio registry ไม่สำเร็จ") from exc
 
