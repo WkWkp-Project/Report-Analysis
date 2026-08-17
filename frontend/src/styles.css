@@ -414,6 +414,34 @@ label:focus-within {
 .campaign-admin-actions button:hover:not(:disabled) { border-color: #9ac9bf; color: var(--teal); }
 .campaign-admin-actions button.save { border-color: var(--teal); background: var(--teal); color: white; }
 .campaign-admin-actions button:disabled { cursor: wait; opacity: .56; }
+.metric-display-scope { padding:14px 18px 15px; border-bottom:1px solid #c9e4de; background:#f4fbf8; }
+.metric-scope-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.metric-scope-heading h3 { margin:0; color:#234b45; font-size:12px; }
+.metric-scope-heading p { margin:3px 0 0; color:#456c65; font-size:10px; line-height:1.5; }
+.metric-scope-heading > strong { padding:5px 7px; border-radius:7px; background:#d8efe8; color:#0b645d; font:600 10px/1.3 "IBM Plex Mono",monospace; white-space:nowrap; }
+.metric-account-options { display:flex; gap:7px; margin-top:11px; overflow-x:auto; }
+.metric-account-options button { min-width:190px; display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:7px; padding:8px 9px; border:1px solid #bfd9d3; border-radius:9px; background:#fff; color:#45615c; text-align:left; cursor:pointer; }
+.metric-account-options button:hover { border-color:#6ca99d; background:#ecf8f4; }
+.metric-account-options button:focus-visible { outline:3px solid rgba(15,118,110,.2); outline-offset:2px; }
+.metric-account-options button:disabled { cursor:not-allowed; opacity:.66; }
+.metric-account-options button.selected { border-color:#5e9f92; background:#dff2ec; color:#0b645d; }
+.metric-account-options button.partial { border-color:#a28a51; background:#fffaf0; color:#725918; }
+.metric-account-options button span { min-width:0; }
+.metric-account-options button small,
+.metric-account-options button strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.metric-account-options button small { font-size:8px; font-weight:500; }
+.metric-account-options button strong { margin-top:2px; font:600 9px/1.3 "IBM Plex Mono",monospace; }
+.metric-account-options button b { font:600 9px/1 "IBM Plex Mono",monospace; }
+.metric-row-options { display:flex; gap:6px; margin-top:8px; overflow-x:auto; }
+.metric-row-options label { min-width:180px; display:flex; align-items:flex-start; gap:7px; padding:8px 9px; border:1px solid #d8e4e0; border-radius:9px; background:#fff; color:#5c6663; cursor:pointer; }
+.metric-row-options label.selected { border-color:#83b9ad; background:#e8f6f1; color:#164f47; }
+.metric-row-options input { margin-top:2px; accent-color:var(--teal); }
+.metric-row-options label:has(input:disabled) { cursor:not-allowed; }
+.metric-row-options span { min-width:0; }
+.metric-row-options strong,
+.metric-row-options small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.metric-row-options strong { font-size:10px; }
+.metric-row-options small { margin-top:2px; font:500 8px/1.3 "IBM Plex Mono",monospace; }
 .override-reason { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid #ece9e4; background: #fffaf0; color: #6d4c16; font-size: 10px; }
 .override-reason input { flex: 1; min-width: 180px; min-height: 34px; padding: 6px 9px; border: 1px solid #d7c9aa; border-radius: 8px; background: white; color: var(--ink); font-size: 11px; }
 .formula-builder { display: grid; grid-template-columns: minmax(140px, .8fr) minmax(140px, .8fr) minmax(240px, 1.6fr) 120px auto; gap: 9px; align-items: end; padding: 13px 18px; border-bottom: 1px solid #c9e4de; background: #f1faf7; }
@@ -434,6 +462,9 @@ label:focus-within {
 .campaign-table tbody tr:last-child td { border-bottom: 0; }
 .campaign-table tbody tr:hover td,
 .campaign-table tbody tr:hover th { background: #fbfefc; }
+.campaign-table tfoot th,
+.campaign-table tfoot td { border-top:2px solid #83b9ad; border-bottom:0; background:#e8f6f1; color:#164f47; font-weight:600; }
+.campaign-table tfoot th:first-child { z-index:2; background:#dff2ec; }
 .campaign-table tbody th strong,
 .campaign-table tbody th small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .campaign-table tbody th strong { font-size: 11px; font-weight: 600; }
@@ -450,6 +481,7 @@ label:focus-within {
 .campaign-table input:focus { border-color: var(--teal); outline: 3px solid rgba(15,118,110,.15); }
 .record-source { display: inline-flex; padding: 4px 6px; border-radius: 7px; background: #efede9; color: var(--muted); font-family: "IBM Plex Sans Thai", sans-serif; font-size: 8px; }
 .record-source.demo { background: #fef3c7; color: #854d0e; }
+.record-source.selected-scope { background:#d4eee7; color:#0b645d; }
 
 @keyframes report-settle {
   from { transform: translateY(5px); filter: blur(2px); }
@@ -819,6 +851,10 @@ label:focus-within {
   .auth-lock { position: static; margin-bottom: 13px; }
   .client-report-shell { width: calc(100% - 28px); padding-top: 20px; }
   .client-report-header { align-items: flex-start; flex-direction: column; }
+  .metric-scope-heading { align-items:stretch; flex-direction:column; gap:7px; }
+  .metric-scope-heading > strong { align-self:flex-start; }
+  .metric-account-options button,
+  .metric-row-options label { min-width:165px; }
   .client-report-actions { width: 100%; justify-content: space-between; }
   .campaign-results-heading { align-items: stretch; flex-direction: column; }
   .campaign-admin-actions { flex-wrap: wrap; }
