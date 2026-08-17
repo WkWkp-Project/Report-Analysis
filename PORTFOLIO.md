@@ -43,3 +43,23 @@ Project เป็น reporting boundary หลักและรองรับ�
 3. `feature/facebook-ads-insights-import` ดึง Ads Insights ตาม scope ที่ผ่าน validation แล้ว
 
 หากระบบเปิดให้หลายบริษัทล็อกอินแยกกัน ต้องเพิ่ม user, workspace membership และ per-resource authorization ก่อนเปลี่ยน Level 1 เป็น multi-tenant
+
+## Project-scoped report elements
+
+Working notes เป็นข้อมูลอีกชุดที่อ้าง `project_id` จาก registry นี้โดยตรง รองรับ `text`, `comment`, `key_takeaway` และ `next_step` และไม่รับ workspace จาก client
+
+- เก็บที่ `APP_DATA_DIR/report_elements/{project_id}.json` ใน volume เดิม
+- ตรวจรูปแบบ Project ID ก่อนสร้าง path และตรวจว่า Project มีอยู่จริงก่อนทุก API call
+- บันทึกเป็น plain text เท่านั้น; React escape ข้อความก่อนแสดงผล
+- update ต้องส่ง `expected_version` เพื่อกันหน้าจอเก่าเขียนทับข้อมูลที่ใหม่กว่า
+- ใช้ atomic write และ permission `0600` แบบเดียวกับ portfolio registry
+- ทุก endpoint ต้องผ่าน session, origin policy และ write rate limit
+
+API ที่เพิ่มใน branch `feature/report-elements-project-scoped`:
+
+- `GET /api/projects/{project_id}/elements`
+- `POST /api/projects/{project_id}/elements`
+- `PATCH /api/projects/{project_id}/elements/{element_id}`
+- `DELETE /api/projects/{project_id}/elements/{element_id}`
+
+งานนี้ไม่เพิ่ม ENV, container, port หรือ database service ใหม่ การ deploy ยังใช้ Docker Compose คำสั่งเดิมและสำรอง named volume `report-analysis-data` ชุดเดียว

@@ -62,3 +62,58 @@ export function refreshFacebookConnection() {
 export function disconnectFacebook() {
   return requestJson('/api/facebook/connection', { method: 'DELETE' });
 }
+
+export function fetchPortfolio() {
+  return requestJson('/api/portfolio');
+}
+
+export function createBrand(payload) {
+  return requestJson('/api/portfolio/brands', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createProject(payload) {
+  return requestJson('/api/portfolio/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createCampaign(payload) {
+  return requestJson('/api/portfolio/campaigns', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchReportElements(projectId, reportKey = 'working') {
+  const params = new URLSearchParams({ report_key: reportKey });
+  return requestJson(`/api/projects/${encodeURIComponent(projectId)}/elements?${params}`);
+}
+
+export function createReportElement(projectId, payload) {
+  return requestJson(`/api/projects/${encodeURIComponent(projectId)}/elements`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateReportElement(projectId, elementId, payload) {
+  return requestJson(`/api/projects/${encodeURIComponent(projectId)}/elements/${encodeURIComponent(elementId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteReportElement(projectId, elementId) {
+  return requestJson(`/api/projects/${encodeURIComponent(projectId)}/elements/${encodeURIComponent(elementId)}`, {
+    method: 'DELETE',
+  });
+}

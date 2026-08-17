@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle, LockKeyhole, LogOut } from 'lucide-react';
-import { disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, login, logout, refreshFacebookConnection, startFacebookConnection } from './api.js';
+import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle, LockKeyhole, LogOut, FolderKanban, Plus, MessageSquareText, ListChecks, Lightbulb, TextQuote, Pencil, Trash2, Save, Check } from 'lucide-react';
+import { createBrand, createCampaign, createProject, createReportElement, deleteReportElement, disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, fetchPortfolio, fetchReportElements, login, logout, refreshFacebookConnection, startFacebookConnection, updateReportElement } from './api.js';
 import './styles.css';
 
 // ============ FORMATTERS ============
@@ -586,6 +586,7 @@ function buildRecommendations(p, er) {
 const WorkspaceSidebar = ({ view, setView, onLogout, canLogout }) => {
   const items = [
     { id: 'report', label: 'Facebook Performance', icon: BarChart3 },
+    { id: 'portfolio', label: 'Brands & projects', icon: FolderKanban },
     { id: 'sources', label: 'Data sources', icon: Database },
   ];
   const planned = [
@@ -786,6 +787,184 @@ const DataSourcesView = ({ loading, onRefresh, facebook, facebookNotice, onFaceb
   );
 };
 
+const PortfolioView = ({ portfolio, selectedProjectId, onSelectProject, onPortfolioChange, onSessionExpiry }) => {
+  const snapshot = portfolio.data;
+  const brands = snapshot?.brands || [];
+  const projects = snapshot?.projects || [];
+  const campaigns = snapshot?.campaigns || [];
+  const [stage, setStage] = useState('brand');
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState(null);
+  const [brandForm, setBrandForm] = useState({ name: '', code: '' });
+  const [projectForm, setProjectForm] = useState({ name: '', description: '', brand_ids: [] });
+  const [campaignForm, setCampaignForm] = useState({ project_id: '', source: 'facebook', source_account_id: '', source_campaign_id: '', name: '', brand_ids: [] });
+
+  useEffect(() => {
+    if (!campaignForm.project_id && projects[0]) {
+      setCampaignForm(current => ({ ...current, project_id: projects[0].id, brand_ids: projects[0].brand_ids }));
+    }
+  }, [projects, campaignForm.project_id]);
+
+  const toggleId = (list, id) => list.includes(id) ? list.filter(item => item !== id) : [...list, id];
+  const submit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setFormError(null);
+    try {
+      let next;
+      if (stage === 'brand') {
+        next = await createBrand({ name: brandForm.name, code: brandForm.code || null });
+        setBrandForm({ name: '', code: '' });
+      } else if (stage === 'project') {
+        next = await createProject({ ...projectForm, description: projectForm.description || null });
+        setProjectForm({ name: '', description: '', brand_ids: [] });
+      } else {
+        next = await createCampaign(campaignForm);
+        setCampaignForm(current => ({ ...current, source_account_id: '', source_campaign_id: '', name: '' }));
+      }
+      onPortfolioChange(next);
+    } catch (err) {
+      if (!onSessionExpiry(err)) setFormError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedCampaignProject = projects.find(project => project.id === campaignForm.project_id);
+  const eligibleBrands = brands.filter(brand => selectedCampaignProject?.brand_ids.includes(brand.id));
+
+  if (portfolio.loading) return <div className="loading-state"><LoaderCircle size={18} /> กำลังอ่านโครงสร้าง workspace...</div>;
+  if (portfolio.error) return <div className="error-state"><AlertCircle size={18} /><div><strong>อ่าน Portfolio ไม่สำเร็จ</strong><span>{portfolio.error}</span></div></div>;
+
+  return (
+    <section className="portfolio-view" aria-labelledby="portfolio-title">
+      <div className="surface-heading">
+        <div>
+          <h1 id="portfolio-title">Brands & projects</h1>
+          <p>จัดโครงงานให้ชัดก่อนเลือกบัญชีและ Campaign ข้อมูลที่ผูกแล้วจะใช้เป็นขอบเขตของการนำเข้า วิเคราะห์ และบันทึกประกอบรายงาน</p>
+        </div>
+        <div className="portfolio-counts" aria-label="Portfolio totals"><span>{brands.length} brands</span><span>{projects.length} projects</span><span>{campaigns.length} campaigns</span></div>
+      </div>
+
+      <div className="portfolio-layout">
+        <aside className="portfolio-setup" aria-labelledby="portfolio-setup-title">
+          <div className="panel-heading compact"><div><h2 id="portfolio-setup-title">เพิ่มขอบเขตงาน</h2><p>สร้างตามลำดับ Brand → Project → Campaign</p></div></div>
+          <div className="setup-tabs" role="tablist" aria-label="Portfolio setup steps">
+            {[['brand', 'Brand'], ['project', 'Project'], ['campaign', 'Campaign']].map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={stage === id} className={stage === id ? 'active' : ''} onClick={() => { setStage(id); setFormError(null); }} disabled={(id === 'project' && !brands.length) || (id === 'campaign' && !projects.length)}>{label}</button>
+            ))}
+          </div>
+
+          <form className="portfolio-form" onSubmit={submit}>
+            {stage === 'brand' && <>
+              <label>ชื่อแบรนด์<input required maxLength="120" value={brandForm.name} onChange={event => setBrandForm({ ...brandForm, name: event.target.value })} placeholder="เช่น Northwind" /></label>
+              <label>รหัสย่อ <span>ไม่บังคับ</span><input maxLength="40" value={brandForm.code} onChange={event => setBrandForm({ ...brandForm, code: event.target.value })} placeholder="NW" /></label>
+            </>}
+            {stage === 'project' && <>
+              <label>ชื่อโปรเจกต์<input required maxLength="160" value={projectForm.name} onChange={event => setProjectForm({ ...projectForm, name: event.target.value })} placeholder="Q3 Campaign Review" /></label>
+              <fieldset><legend>แบรนด์ในโปรเจกต์</legend>{brands.map(brand => <label className="check-row" key={brand.id}><input type="checkbox" checked={projectForm.brand_ids.includes(brand.id)} onChange={() => setProjectForm({ ...projectForm, brand_ids: toggleId(projectForm.brand_ids, brand.id) })} /><span>{brand.name}</span></label>)}</fieldset>
+              <label>รายละเอียด <span>ไม่บังคับ</span><textarea maxLength="1000" rows="3" value={projectForm.description} onChange={event => setProjectForm({ ...projectForm, description: event.target.value })} /></label>
+            </>}
+            {stage === 'campaign' && <>
+              <label>โปรเจกต์<select required value={campaignForm.project_id} onChange={event => { const project = projects.find(item => item.id === event.target.value); setCampaignForm({ ...campaignForm, project_id: event.target.value, brand_ids: project?.brand_ids || [] }); }}><option value="">เลือกโปรเจกต์</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+              <label>แหล่งข้อมูล<select value={campaignForm.source} onChange={event => setCampaignForm({ ...campaignForm, source: event.target.value })}><option value="facebook">Facebook API</option><option value="file">Excel / CSV</option></select></label>
+              <label>ชื่อ Campaign<input required maxLength="200" value={campaignForm.name} onChange={event => setCampaignForm({ ...campaignForm, name: event.target.value })} /></label>
+              <label>Account ID<input required maxLength="128" value={campaignForm.source_account_id} onChange={event => setCampaignForm({ ...campaignForm, source_account_id: event.target.value })} /></label>
+              <label>Campaign ID<input required maxLength="128" value={campaignForm.source_campaign_id} onChange={event => setCampaignForm({ ...campaignForm, source_campaign_id: event.target.value })} /></label>
+              <fieldset><legend>แบรนด์ที่ Campaign นี้เกี่ยวข้อง</legend>{eligibleBrands.map(brand => <label className="check-row" key={brand.id}><input type="checkbox" checked={campaignForm.brand_ids.includes(brand.id)} onChange={() => setCampaignForm({ ...campaignForm, brand_ids: toggleId(campaignForm.brand_ids, brand.id) })} /><span>{brand.name}</span></label>)}</fieldset>
+            </>}
+            {formError && <div className="inline-error" role="alert"><AlertCircle size={15} />{formError}</div>}
+            <button className="primary-action" type="submit" disabled={saving || (stage === 'project' && !projectForm.brand_ids.length) || (stage === 'campaign' && !campaignForm.brand_ids.length)}>{saving ? <LoaderCircle className="button-spinner" size={16} /> : <Plus size={16} />} เพิ่ม {stage}</button>
+          </form>
+        </aside>
+
+        <div className="portfolio-ledger">
+          <div className="ledger-heading"><div><h2>Project registry</h2><p>เลือก Project เพื่อกำหนดบริบทให้รายงานและ Working notes</p></div></div>
+          {!projects.length ? <div className="portfolio-empty"><FolderKanban size={24} /><strong>ยังไม่มี Project</strong><span>เริ่มจากเพิ่ม Brand ทางซ้าย แล้วจึงสร้าง Project แรก</span></div> : projects.map(project => {
+            const projectBrands = brands.filter(brand => project.brand_ids.includes(brand.id));
+            const projectCampaigns = campaigns.filter(campaign => campaign.project_id === project.id);
+            return <button key={project.id} className={`project-row ${selectedProjectId === project.id ? 'selected' : ''}`} type="button" onClick={() => onSelectProject(project.id)}>
+              <span className="project-row-main"><strong>{project.name}</strong><small>{project.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</small></span>
+              <span className="project-row-brands">{projectBrands.map(brand => brand.name).join(' · ')}</span>
+              <span className="project-row-count"><strong>{projectCampaigns.length}</strong><small>Campaigns</small></span>
+              <ChevronRight size={16} />
+            </button>;
+          })}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const ELEMENT_KINDS = {
+  text: { label: 'Text box', icon: TextQuote },
+  comment: { label: 'Comment', icon: MessageSquareText },
+  key_takeaway: { label: 'Key takeaway', icon: Lightbulb },
+  next_step: { label: 'Next step', icon: ListChecks },
+};
+
+const ReportElementsPanel = ({ project, onOpenPortfolio, onSessionExpiry }) => {
+  const [state, setState] = useState({ loading: false, error: null, elements: [] });
+  const [form, setForm] = useState({ kind: 'comment', title: '', content: '' });
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [draft, setDraft] = useState({ title: '', content: '' });
+
+  const loadElements = () => {
+    if (!project) return;
+    setState(current => ({ ...current, loading: true, error: null }));
+    fetchReportElements(project.id)
+      .then(data => setState({ loading: false, error: null, elements: data.elements || [] }))
+      .catch(err => { if (!onSessionExpiry(err)) setState(current => ({ ...current, loading: false, error: err.message })); });
+  };
+  useEffect(loadElements, [project?.id]);
+
+  const submit = async event => {
+    event.preventDefault(); setSaving(true); setState(current => ({ ...current, error: null }));
+    try {
+      const element = await createReportElement(project.id, { report_key: 'working', kind: form.kind, title: form.title || null, content: form.content, position: state.elements.length });
+      setState(current => ({ ...current, elements: [...current.elements, element] }));
+      setForm(current => ({ ...current, title: '', content: '' }));
+    } catch (err) { if (!onSessionExpiry(err)) setState(current => ({ ...current, error: err.message })); }
+    finally { setSaving(false); }
+  };
+  const patchElement = async (element, changes) => {
+    try {
+      const updated = await updateReportElement(project.id, element.id, { expected_version: element.version, ...changes });
+      setState(current => ({ ...current, elements: current.elements.map(item => item.id === updated.id ? updated : item), error: null }));
+      setEditingId(null);
+    } catch (err) { if (!onSessionExpiry(err)) setState(current => ({ ...current, error: err.message })); }
+  };
+  const removeElement = async element => {
+    if (!window.confirm('ลบข้อความนี้ออกจาก Project?')) return;
+    try {
+      await deleteReportElement(project.id, element.id);
+      setState(current => ({ ...current, elements: current.elements.filter(item => item.id !== element.id), error: null }));
+    } catch (err) { if (!onSessionExpiry(err)) setState(current => ({ ...current, error: err.message })); }
+  };
+
+  return <section className="report-elements" aria-labelledby="report-elements-title">
+    <div className="elements-heading"><div><div className="section-kicker">Project workspace</div><h2 id="report-elements-title">Working notes</h2><p>เพิ่มบริบทที่ตัวเลขบอกไม่ได้ และเก็บ Next step ไว้กับ Project นี้โดยตรง</p></div>{project && <span className="project-context-chip">{project.name}</span>}</div>
+    {!project ? <div className="elements-locked"><FolderKanban size={21} /><div><strong>เลือก Project ก่อนเพิ่มข้อความ</strong><span>การบังคับ scope ช่วยป้องกันโน้ตของหลายแบรนด์ปะปนกัน</span></div><button className="secondary-action" type="button" onClick={onOpenPortfolio}>ตั้งค่า Project</button></div> : <>
+      <form className="element-composer" onSubmit={submit}>
+        <div className="kind-selector" role="radiogroup" aria-label="ชนิดข้อความ">{Object.entries(ELEMENT_KINDS).map(([id, config]) => { const Icon = config.icon; return <button key={id} type="button" role="radio" aria-checked={form.kind === id} className={form.kind === id ? 'active' : ''} onClick={() => setForm({ ...form, kind: id })}><Icon size={15} />{config.label}</button>; })}</div>
+        <input aria-label="หัวข้อข้อความ" maxLength="160" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} placeholder="หัวข้อ (ไม่บังคับ)" />
+        <textarea aria-label="เนื้อหาข้อความ" required maxLength="12000" rows="4" value={form.content} onChange={event => setForm({ ...form, content: event.target.value })} placeholder="เขียนข้อสังเกต คีย์สำคัญ หรือสิ่งที่ต้องทำต่อ..." />
+        <div className="composer-footer"><span>{form.content.length.toLocaleString()} / 12,000</span><button className="primary-action" type="submit" disabled={saving || !form.content.trim()}>{saving ? <LoaderCircle className="button-spinner" size={16} /> : <Plus size={16} />} เพิ่มในรายงาน</button></div>
+      </form>
+      {state.error && <div className="inline-error" role="alert"><AlertCircle size={15} />{state.error}<button type="button" onClick={loadElements}>โหลดใหม่</button></div>}
+      {state.loading ? <div className="element-loading"><LoaderCircle className="button-spinner" size={16} /> กำลังโหลด Working notes...</div> : !state.elements.length ? <div className="elements-empty">ยังไม่มีข้อความใน Project นี้ — เริ่มจากข้อสังเกตที่ต้องใช้ประกอบการตัดสินใจ</div> : <div className="element-list">{state.elements.map(element => {
+        const config = ELEMENT_KINDS[element.kind]; const Icon = config.icon; const editing = editingId === element.id;
+        return <article className={`element-row ${element.status === 'done' ? 'done' : ''}`} key={element.id}>
+          <div className="element-kind"><Icon size={16} /><span>{config.label}</span></div>
+          <div className="element-body">{editing ? <><input aria-label="แก้หัวข้อ" maxLength="160" value={draft.title} onChange={event => setDraft({ ...draft, title: event.target.value })} /><textarea aria-label="แก้เนื้อหา" required maxLength="12000" rows="3" value={draft.content} onChange={event => setDraft({ ...draft, content: event.target.value })} /></> : <>{element.title && <h3>{element.title}</h3>}<p>{element.content}</p></>}</div>
+          <div className="element-actions">{element.kind === 'next_step' && <button className="icon-action" type="button" title={element.status === 'done' ? 'เปิดอีกครั้ง' : 'ทำเสร็จแล้ว'} aria-label={element.status === 'done' ? 'เปิด Next step อีกครั้ง' : 'ทำเครื่องหมายว่าเสร็จ'} onClick={() => patchElement(element, { status: element.status === 'done' ? 'open' : 'done' })}>{element.status === 'done' ? <Check size={16} /> : <CircleCheck size={16} />}</button>}{editing ? <button className="icon-action" type="button" aria-label="บันทึกการแก้ไข" disabled={!draft.content.trim()} onClick={() => patchElement(element, { title: draft.title, content: draft.content })}><Save size={16} /></button> : <button className="icon-action" type="button" aria-label="แก้ข้อความ" onClick={() => { setEditingId(element.id); setDraft({ title: element.title || '', content: element.content }); }}><Pencil size={15} /></button>}<button className="icon-action danger" type="button" aria-label="ลบข้อความ" onClick={() => removeElement(element)}><Trash2 size={15} /></button></div>
+        </article>;
+      })}</div>}
+    </>}
+  </section>;
+};
+
 const LoginGate = ({ loading, error, onSubmit }) => {
   const [password, setPassword] = useState('');
 
@@ -848,6 +1027,8 @@ export default function Dashboard() {
   const [selectedPost, setSelectedPost] = useState(null);
   const [mode, setMode] = useState('combined');
   const [state, setState] = useState({ loading: true, error: null, data: null });
+  const [portfolio, setPortfolio] = useState({ loading: true, error: null, data: null });
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [facebook, setFacebook] = useState({ loading: true, connecting: false, error: null, data: null });
   const [facebookNotice, setFacebookNotice] = useState(null);
   const [auth, setAuth] = useState({ loading: true, submitting: false, error: null, configured: false, required: false, authenticated: false });
@@ -907,6 +1088,22 @@ export default function Dashboard() {
     return () => { alive = false; };
   }, [refreshKey, appReady]);
 
+  const loadPortfolio = () => {
+    setPortfolio(current => ({ ...current, loading: true, error: null }));
+    return fetchPortfolio()
+      .then(snapshot => {
+        setPortfolio({ loading: false, error: null, data: snapshot });
+        setSelectedProjectId(current => snapshot.projects.some(project => project.id === current) ? current : (snapshot.projects.find(project => project.status === 'active')?.id || null));
+      })
+      .catch(err => {
+        if (!handleSessionExpiry(err)) setPortfolio(current => ({ ...current, loading: false, error: err.message }));
+      });
+  };
+
+  useEffect(() => {
+    if (appReady) loadPortfolio();
+  }, [appReady]);
+
   const handleLogin = async (password) => {
     setAuth(current => ({ ...current, submitting: true, error: null }));
     try {
@@ -924,6 +1121,8 @@ export default function Dashboard() {
     } finally {
       setAuth(current => ({ ...current, authenticated: false, error: null }));
       setState({ loading: true, error: null, data: null });
+      setPortfolio({ loading: true, error: null, data: null });
+      setSelectedProjectId(null);
       setFacebook({ loading: true, connecting: false, error: null, data: null });
     }
   };
@@ -960,7 +1159,13 @@ export default function Dashboard() {
       if (!handleSessionExpiry(err)) setFacebook(current => ({ ...current, connecting: false, error: err.message }));
     }
   };
+  const handlePortfolioChange = snapshot => {
+    setPortfolio({ loading: false, error: null, data: snapshot });
+    setSelectedProjectId(current => snapshot.projects.some(project => project.id === current) ? current : (snapshot.projects.find(project => project.status === 'active')?.id || null));
+  };
   const { loading, error, data } = state;
+  const selectedProject = portfolio.data?.projects.find(project => project.id === selectedProjectId) || null;
+  const viewTitles = { report: 'Facebook Performance', portfolio: 'Brands & projects', sources: 'Data workspace' };
 
   if (auth.loading) {
     return <main className="auth-shell" style={fontStyle}><div className="auth-loading"><LoaderCircle size={18} /> กำลังตรวจสอบพื้นที่ทำงาน...</div></main>;
@@ -977,17 +1182,22 @@ export default function Dashboard() {
       <main className="workspace-main">
         <header className="workspace-topbar">
           <div>
-            <div className="workspace-context">Marketing workspace</div>
-            <div className="workspace-title">{view === 'report' ? 'Facebook Performance' : 'Data workspace'}</div>
+            <div className="workspace-context">{portfolio.data?.workspace.name || 'Marketing workspace'}</div>
+            <div className="workspace-title">{viewTitles[view]}</div>
           </div>
-          <button className="data-health-button" onClick={() => setView('sources')}>
-            <span className={`health-indicator ${error ? 'error' : ''}`}></span>
-            {error ? 'Data source error' : data?.demo ? 'Demo source active' : 'Sources healthy'}
-          </button>
+          <div className="topbar-actions">
+            {portfolio.data?.projects.length > 0 ? <label className="project-switcher"><span>Project</span><select value={selectedProjectId || ''} onChange={event => setSelectedProjectId(event.target.value)}>{portfolio.data.projects.filter(project => project.status === 'active').map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label> : <button className="secondary-action" type="button" onClick={() => setView('portfolio')}><FolderKanban size={15} /> ตั้งค่า Project</button>}
+            <button className="data-health-button" onClick={() => setView('sources')}>
+              <span className={`health-indicator ${error ? 'error' : ''}`}></span>
+              {error ? 'Data source error' : data?.demo ? 'Demo source active' : 'Sources healthy'}
+            </button>
+          </div>
         </header>
 
         <div className="workspace-content">
-          {view === 'sources' ? (
+          {view === 'portfolio' ? (
+            <PortfolioView portfolio={portfolio} selectedProjectId={selectedProjectId} onSelectProject={setSelectedProjectId} onPortfolioChange={handlePortfolioChange} onSessionExpiry={handleSessionExpiry} />
+          ) : view === 'sources' ? (
             <DataSourcesView
               loading={loading}
               onRefresh={() => { setRefreshKey(key => key + 1); loadFacebookStatus(); }}
@@ -1045,6 +1255,7 @@ export default function Dashboard() {
                   </>
                 )}
               </div>
+              <ReportElementsPanel project={selectedProject} onOpenPortfolio={() => setView('portfolio')} onSessionExpiry={handleSessionExpiry} />
             </section>
           )}
         </div>

@@ -168,7 +168,7 @@ Claude จะอ่านโค้ด, แก้ไขไฟล์, รัน te
 docker compose up --build -d
 ```
 
-เปิด `http://localhost:8000` โดย FastAPI จะ serve ทั้ง REST API และ React production build ส่วนข้อมูล runtime อยู่ใน `./data` ผ่าน persistent volume
+เปิด `http://localhost:8000` โดย FastAPI จะ serve ทั้ง REST API และ React production build ส่วนข้อมูล runtimeอยู่ใน named volume `report-analysis-data` ซึ่งรวม portfolio, report elements และ Facebook connection ที่เข้ารหัสไว้ โดยไม่ต้องเพิ่ม database container
 
 ### Validation tests
 

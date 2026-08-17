@@ -35,6 +35,12 @@ from portfolio import (
     ProjectCreate,
     WorkspaceUpdate,
 )
+from report_elements import (
+    ReportElementCreate,
+    ReportElementError,
+    ReportElementStore,
+    ReportElementUpdate,
+)
 from scoring import PostScorer, calculate_baseline
 from serializer import build_payload
 import topic_extractor
@@ -46,6 +52,7 @@ security_settings = SecuritySettings.from_environment()
 session_manager = SessionManager(security_settings)
 rate_limiter = RateLimiter()
 portfolio_store = PortfolioStore()
+report_element_store = ReportElementStore()
 
 app = FastAPI(
     title="FB Performance Analyzer API",
@@ -135,6 +142,15 @@ def _is_authenticated(request: Request) -> bool:
 def _require_authenticated(request: Request) -> None:
     if not _is_authenticated(request):
         raise HTTPException(status_code=401, detail="กรุณาเข้าสู่ระบบก่อนใช้งาน")
+
+
+def _require_project(project_id: str) -> None:
+    try:
+        projects = portfolio_store.snapshot().projects
+    except PortfolioError as exc:
+        raise HTTPException(status_code=500, detail="อ่าน portfolio registry ไม่สำเร็จ") from exc
+    if not any(project.id == project_id for project in projects):
+        raise HTTPException(status_code=404, detail="ไม่พบโปรเจกต์ที่เลือก")
 
 
 def _has_credentials() -> bool:
@@ -310,6 +326,72 @@ def portfolio_create_campaign(payload: CampaignCreate, request: Request):
         return portfolio_store.create_campaign(payload).model_dump(mode="json")
     except PortfolioError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/projects/{project_id}/elements")
+def report_element_list(
+    project_id: str,
+    request: Request,
+    report_key: str = Query(default="working", min_length=1, max_length=80),
+):
+    _require_authenticated(request)
+    _require_project(project_id)
+    try:
+        return {
+            "project_id": project_id,
+            "report_key": report_key,
+            "elements": [
+                item.model_dump(mode="json")
+                for item in report_element_store.list(project_id, report_key)
+            ],
+        }
+    except ReportElementError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/elements", status_code=201)
+def report_element_create(
+    project_id: str, payload: ReportElementCreate, request: Request
+):
+    _require_authenticated(request)
+    _require_project(project_id)
+    _enforce_rate_limit(request, action="report_element_write", limit=120, window_seconds=60)
+    try:
+        return report_element_store.create(project_id, payload).model_dump(mode="json")
+    except ReportElementError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.patch("/api/projects/{project_id}/elements/{element_id}")
+def report_element_update(
+    project_id: str,
+    element_id: str,
+    payload: ReportElementUpdate,
+    request: Request,
+):
+    _require_authenticated(request)
+    _require_project(project_id)
+    _enforce_rate_limit(request, action="report_element_write", limit=120, window_seconds=60)
+    try:
+        return report_element_store.update(project_id, element_id, payload).model_dump(
+            mode="json"
+        )
+    except ReportElementError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.delete("/api/projects/{project_id}/elements/{element_id}")
+def report_element_delete(project_id: str, element_id: str, request: Request):
+    _require_authenticated(request)
+    _require_project(project_id)
+    _enforce_rate_limit(request, action="report_element_write", limit=120, window_seconds=60)
+    try:
+        deleted = report_element_store.delete(project_id, element_id)
+    except ReportElementError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="ไม่พบ report element")
+    return {"deleted": True}
 
 
 @app.get("/api/facebook/status")
