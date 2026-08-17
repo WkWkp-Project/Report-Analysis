@@ -249,6 +249,34 @@ label:focus-within {
 .surface-heading h1 { margin: 0; font-size: clamp(21px, 2.3vw, 29px); line-height: 1.2; letter-spacing: -0.025em; font-weight: 600; }
 .report-header p,
 .surface-heading p { max-width: 72ch; margin: 6px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.report-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.exact-value { position: relative; display: inline-block; cursor: help; text-decoration: underline dotted #aaa49d; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.exact-value::after {
+  content: attr(data-exact);
+  position: absolute;
+  z-index: 20;
+  inset: auto auto calc(100% + 8px) 50%;
+  min-width: max-content;
+  max-width: min(290px, 80vw);
+  padding: 7px 9px;
+  transform: translate(-50%, 3px);
+  border-radius: 7px;
+  background: #1f2927;
+  color: #fff;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease-out, transform 140ms ease-out;
+  box-shadow: 0 6px 16px rgba(28,25,23,.18);
+}
+.exact-value:hover::after,
+.exact-value:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.exact-value:focus-visible { border-radius: 3px; outline: 2px solid rgba(15,118,110,.35); outline-offset: 3px; }
 
 .demo-badge {
   padding: 4px 8px;
@@ -264,6 +292,20 @@ label:focus-within {
 .mode-switch { display: flex; gap: 3px; padding: 3px; border-radius: 9px; background: #ebe8e2; }
 .mode-switch button { min-height: 30px; padding: 5px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
 .mode-switch button.active { background: var(--surface); color: var(--ink); font-weight: 500; box-shadow: 0 3px 10px rgba(41, 37, 36, 0.07); }
+
+.period-control { margin-bottom: 14px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.period-presets { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 9px; }
+.period-presets button { min-height: 29px; padding: 5px 9px; border: 0; border-radius: 7px; background: #f0eee9; color: var(--muted); font-size: 10px; cursor: pointer; }
+.period-presets button:hover:not(:disabled) { background: var(--teal-soft); color: var(--teal); }
+.period-presets button:disabled { cursor: wait; opacity: .55; }
+.period-dates { display: flex; align-items: flex-end; gap: 8px; }
+.period-dates label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 9px; }
+.period-dates input { min-height: 36px; padding: 6px 9px; border: 1px solid #cfcac2; border-radius: 8px; background: #fbfaf8; color: var(--ink); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; }
+.period-dates input:focus { border-color: var(--teal); background: var(--surface); outline: 3px solid rgba(15,118,110,.15); }
+.period-separator { align-self: center; margin-top: 13px; color: #aaa49d; }
+.period-apply { min-height: 36px; display: inline-flex; align-items: center; gap: 7px; margin-left: auto; padding: 7px 11px; border: 0; border-radius: 9px; background: var(--teal); color: white; font-size: 11px; font-weight: 500; cursor: pointer; }
+.period-apply:disabled { cursor: not-allowed; background: #a6aaa7; }
+.period-error { margin-top: 7px; color: var(--danger); font-size: 10px; }
 
 .tier-nav {
   display: flex;
@@ -557,7 +599,14 @@ label:focus-within {
   .workspace-content { padding: 20px 14px 36px; }
   .report-header,
   .surface-heading { align-items: stretch; flex-direction: column; gap: 15px; }
+  .report-header-actions { align-items: stretch; flex-direction: column-reverse; }
+  .comment-jump { align-self: flex-start; }
   .mode-switch { align-self: flex-start; }
+  .period-dates { align-items: stretch; flex-wrap: wrap; }
+  .period-dates label { flex: 1 1 135px; }
+  .period-dates input { width: 100%; min-height: 42px; font-size: 16px; }
+  .period-separator { display: none; }
+  .period-apply { flex: 1 1 100%; justify-content: center; margin-left: 0; }
   .tier-nav { margin-left: -2px; margin-right: -2px; }
   .tier-chevron { display: none; }
   .tier-nav button { padding: 6px 8px; }

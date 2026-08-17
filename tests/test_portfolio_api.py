@@ -121,6 +121,23 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(server.portfolio_store.snapshot().brands, [])
 
+    def test_analysis_period_is_validated_and_returned(self):
+        self.login()
+        invalid = self.client.get(
+            "/api/analyze?since=2026-08-10&until=2026-08-01&demo=1"
+        )
+        self.assertEqual(invalid.status_code, 422)
+        self.assertEqual(invalid.json()["detail"], "วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด")
+
+        response = self.client.get(
+            "/api/analyze?since=2026-08-01&until=2026-08-07&demo=1"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["range"],
+            {"since": "2026-08-01", "until": "2026-08-07"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

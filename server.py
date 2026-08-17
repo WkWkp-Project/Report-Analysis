@@ -485,22 +485,26 @@ def facebook_disconnect(request: Request):
 @app.get("/api/analyze")
 def analyze(
     request: Request,
-    since: str = Query(default=None),
-    until: str = Query(default=None),
+    since: date | None = Query(default=None),
+    until: date | None = Query(default=None),
     demo: int = Query(default=0),
 ):
     _require_authenticated(request)
     _enforce_rate_limit(request, action="analyze", limit=30, window_seconds=60)
-    until = until or str(date.today())
-    since = since or str(date.today() - timedelta(days=90))
+    until_date = until or date.today()
+    since_date = since or (until_date - timedelta(days=89))
+    if since_date > until_date:
+        raise HTTPException(status_code=422, detail="วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด")
+    since_value = str(since_date)
+    until_value = str(until_date)
 
     use_demo = bool(demo) or not _has_credentials()
 
     if use_demo:
         from sample_data import sample_posts, sample_page_info
-        posts_raw = sample_posts()
+        posts_raw = sample_posts(start_date=since_date, span_days=(until_date - since_date).days + 1)
         page_info = sample_page_info()
-        payload = _run_pipeline(posts_raw, page_info, since, until)
+        payload = _run_pipeline(posts_raw, page_info, since_value, until_value)
         payload["demo"] = True
         return payload
 
@@ -508,8 +512,8 @@ def analyze(
         from api_client import FBClient
         client = FBClient()
         page_info = client.get_page_info()
-        posts_raw = client.pull_all(since, until)
-        payload = _run_pipeline(posts_raw, page_info, since, until)
+        posts_raw = client.pull_all(since_value, until_value)
+        payload = _run_pipeline(posts_raw, page_info, since_value, until_value)
         payload["demo"] = False
         return payload
     except Exception:

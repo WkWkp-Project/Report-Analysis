@@ -6,7 +6,7 @@ sample_data.py
 """
 
 import random
-from datetime import datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 _FORMATS = ["Reel", "Carousel", "Photo", "Video", "Link"]
 _TITLES = [
@@ -21,10 +21,16 @@ _TITLES = [
 ]
 
 
-def sample_posts(n: int = 32, seed: int = 7) -> list[dict]:
+def sample_posts(
+    n: int = 32,
+    seed: int = 7,
+    start_date: date | None = None,
+    span_days: int = 90,
+) -> list[dict]:
     # Deterministic demo fixture; this generator never creates secrets.
     rng = random.Random(seed)  # nosec B311
-    start = datetime(2026, 1, 1, tzinfo=None)
+    start = datetime.combine(start_date or date(2026, 1, 1), time.min)
+    day_ceiling = max(0, span_days - 1)
     posts = []
     for i in range(n):
         fmt = rng.choice(_FORMATS)
@@ -41,7 +47,7 @@ def sample_posts(n: int = 32, seed: int = 7) -> list[dict]:
             organic = reach
         viral = int(reach * rng.uniform(0.02, 0.18))
 
-        dt = start + timedelta(days=rng.randint(0, 89),
+        dt = start + timedelta(days=rng.randint(0, day_ceiling),
                                hours=rng.choice([8, 10, 12, 14, 17, 19, 20, 21]),
                                minutes=rng.choice([0, 30]))
         spend = round(rng.uniform(8000, 50000)) if is_paid else None
@@ -104,7 +110,7 @@ def sample_posts(n: int = 32, seed: int = 7) -> list[dict]:
             "ad_cpc": round(rng.uniform(2, 9), 2) if is_paid else None,
             "ad_roas": round(rng.uniform(2.0, 6.5), 1) if (is_paid and objective == "CONVERSIONS") else None,
 
-            "data_pulled_at": datetime.utcnow().isoformat(),
+            "data_pulled_at": datetime.now(UTC).isoformat(),
             "missing_fields": [],
         }
         posts.append(post)

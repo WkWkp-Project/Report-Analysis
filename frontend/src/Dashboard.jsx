@@ -12,6 +12,19 @@ const fmt = (n) => {
 };
 const fmtMoney = (n) => (n === null || n === undefined) ? 'N/A' : '฿' + (n >= 1000 ? (n / 1000).toFixed(1) + 'K' : n.toLocaleString());
 const fmtNum = (n, d = 0) => (n === null || n === undefined) ? 'N/A' : Number(n).toFixed(d);
+const exactNumber = (n, options = {}) => (n === null || n === undefined || Number.isNaN(Number(n))) ? null : new Intl.NumberFormat('th-TH', { maximumFractionDigits: 6, ...options }).format(Number(n));
+const exactMoney = (n) => n === null || n === undefined ? null : `฿${exactNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const dateInputValue = (value) => {
+  const date = new Date(value);
+  const pad = number => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+const defaultPeriod = () => {
+  const until = new Date();
+  const since = new Date(until);
+  since.setDate(since.getDate() - 89);
+  return { since: dateInputValue(since), until: dateInputValue(until) };
+};
 const pct = (num, den, d = 1) => (num === null || num === undefined || !den) ? null : (num / den * 100).toFixed(d);
 const delta = (val, base) => {
   if (val === null || val === undefined || base === null || base === undefined || !base) return null;
@@ -29,6 +42,11 @@ const gradeColor = (g) => ({ A: '#0F766E', B: '#65A30D', C: '#CA8A04', D: '#C241
 const FREQ_TARGET = 2.0; // backend convention: frequency ควร ≤ 2.0
 
 // ============ ATOMS ============
+const ExactValue = ({ children, exact }) => {
+  if (!exact || exact === children) return <>{children}</>;
+  return <span className="exact-value" tabIndex="0" title={`ค่าจริง ${exact}`} data-exact={exact} aria-label={`${children} — ค่าจริง ${exact}`}>{children}</span>;
+};
+
 const TypeBadge = ({ type }) => {
   const styles = {
     boosted: { bg: '#E1F5EE', color: '#0F766E', label: 'Boosted' },
@@ -52,21 +70,21 @@ const SectionTitle = ({ num, title }) => (
   </div>
 );
 
-const MetricBox = ({ label, value, sub, good, warn, mini }) => (
+const MetricBox = ({ label, value, exact, sub, good, warn, mini }) => (
   <div>
     <div style={{ fontSize: 10, color: '#78716C', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
-    <div style={{ fontSize: mini ? 13 : 16, fontWeight: 500, marginTop: 2, color: warn ? '#CA8A04' : 'inherit', ...monoStyle }}>{value}</div>
+    <div style={{ fontSize: mini ? 13 : 16, fontWeight: 500, marginTop: 2, color: warn ? '#CA8A04' : 'inherit', ...monoStyle }}><ExactValue exact={exact}>{value}</ExactValue></div>
     {sub && <div style={{ fontSize: 10, color: good ? '#0F766E' : '#78716C', marginTop: 2 }}>{sub}</div>}
   </div>
 );
 
-const Row = ({ label, value, sub, good, warn }) => (
+const Row = ({ label, value, exact, sub, good, warn }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingBottom: 6, borderBottom: '0.5px solid #F5F5F4' }}>
     <div>
       <div style={{ fontSize: 12, color: '#57534E' }}>{label}</div>
       {sub && <div style={{ fontSize: 10, color: '#78716C', marginTop: 2 }}>{sub}</div>}
     </div>
-    <div style={{ fontSize: 14, fontWeight: 500, color: good ? '#0F766E' : warn ? '#CA8A04' : 'inherit', ...monoStyle }}>{value}</div>
+    <div style={{ fontSize: 14, fontWeight: 500, color: good ? '#0F766E' : warn ? '#CA8A04' : 'inherit', ...monoStyle }}><ExactValue exact={exact}>{value}</ExactValue></div>
   </div>
 );
 
@@ -125,9 +143,9 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
   const posts = applyMode(data.posts, mode);
 
   const kpis = [
-    { label: 'Reach', v: fmt(ov.reach_total), sub: `Organic ${fmt(ov.reach_organic)} · Paid ${fmt(ov.reach_paid)}` },
+    { label: 'Reach', v: fmt(ov.reach_total), exact: exactNumber(ov.reach_total), sub: <>Organic <ExactValue exact={exactNumber(ov.reach_organic)}>{fmt(ov.reach_organic)}</ExactValue> · Paid <ExactValue exact={exactNumber(ov.reach_paid)}>{fmt(ov.reach_paid)}</ExactValue></> },
     { label: 'ER', v: ov.avg_er != null ? `${ov.avg_er}%` : 'N/A', sub: baseline.ER != null ? `baseline ${baseline.ER}%` : '' },
-    { label: 'Spend', v: fmtMoney(ov.spend_total), sub: `CPM ${fmtMoney(ov.cpm)} · CPE ${ov.cpe != null ? '฿' + ov.cpe : 'N/A'}` },
+    { label: 'Spend', v: fmtMoney(ov.spend_total), exact: exactMoney(ov.spend_total), sub: <>CPM <ExactValue exact={exactMoney(ov.cpm)}>{fmtMoney(ov.cpm)}</ExactValue> · CPE {ov.cpe != null ? '฿' + ov.cpe : 'N/A'}</> },
     { label: 'ROAS', v: ov.roas != null ? `${ov.roas}×` : 'N/A', sub: 'conversion ads only' },
   ];
 
@@ -140,7 +158,7 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
         {kpis.map(k => (
           <div key={k.label} style={{ flex: 1, background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: '14px 16px' }}>
             <div style={{ fontSize: 11, color: '#78716C', textTransform: 'uppercase', letterSpacing: 0.5 }}>{k.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 500, marginTop: 4, ...monoStyle }}>{k.v}</div>
+            <div style={{ fontSize: 24, fontWeight: 500, marginTop: 4, ...monoStyle }}><ExactValue exact={k.exact}>{k.v}</ExactValue></div>
             <div style={{ fontSize: 10, color: '#78716C', marginTop: 4 }}>{k.sub}</div>
           </div>
         ))}
@@ -249,7 +267,7 @@ const TierAdsOrganic = ({ data }) => {
             <div style={{ fontSize: 11, color: '#78716C', marginLeft: 'auto' }}>n = {organic.length} posts</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Row label="Reach" value={fmt(o.reach)} />
+            <Row label="Reach" value={fmt(o.reach)} exact={exactNumber(o.reach)} />
             <Row label="ER" value={o.er != null ? `${o.er}%` : 'N/A'} sub={baseline.ER != null ? `baseline ${baseline.ER}%` : ''} good={o.er != null && baseline.ER != null && o.er > baseline.ER} />
             <Row label="Avg save rate" value={baseline.save != null ? `${baseline.save}%` : 'N/A'} sub="page median" />
           </div>
@@ -262,9 +280,9 @@ const TierAdsOrganic = ({ data }) => {
             <div style={{ fontSize: 11, color: '#78716C', marginLeft: 'auto' }}>n = {paid.length} ads</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Row label="Reach" value={fmt(pp.reach)} />
+            <Row label="Reach" value={fmt(pp.reach)} exact={exactNumber(pp.reach)} />
             <Row label="ER" value={pp.er != null ? `${pp.er}%` : 'N/A'} sub="paid sees broader audience" />
-            <Row label="Spend total" value={fmtMoney(pp.spend)} />
+            <Row label="Spend total" value={fmtMoney(pp.spend)} exact={exactMoney(pp.spend)} />
             <Row label="Avg CPE" value={pp.cpe != null ? `฿${pp.cpe}` : 'N/A'} />
           </div>
         </div>
@@ -327,7 +345,7 @@ const TierAdsOrganic = ({ data }) => {
             {data.cost_table.map((r, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 80px', gap: 8, fontSize: 12, padding: '8px 0', borderTop: i > 0 ? '0.5px solid #F5F5F4' : 'none' }}>
                 <div>{r.row}</div>
-                <div style={{ textAlign: 'right', ...monoStyle }}>{fmtMoney(r.spend)}</div>
+                <div style={{ textAlign: 'right', ...monoStyle }}><ExactValue exact={exactMoney(r.spend)}>{fmtMoney(r.spend)}</ExactValue></div>
                 <div style={{ textAlign: 'right', ...monoStyle }}>{r.cpm != null ? `฿${r.cpm}` : 'N/A'}</div>
                 <div style={{ textAlign: 'right', color: r.good === false ? '#991B1B' : r.good ? '#0F766E' : 'inherit', ...monoStyle }}>{r.cpe != null ? `฿${r.cpe}` : 'N/A'}</div>
                 <div style={{ textAlign: 'right', color: r.good === false ? '#991B1B' : r.good ? '#0F766E' : 'inherit', ...monoStyle }}>{r.roas != null ? `${r.roas}×` : 'N/A'}</div>
@@ -373,10 +391,10 @@ const TierPostDetail = ({ post: p, baseline }) => {
       <SectionTitle num="1" title="Distribution" />
       <div style={{ background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: 14, marginBottom: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          <MetricBox label="Impressions" value={fmt(p.impressions)} />
-          <MetricBox label="Reach unique" value={fmt(p.reach)} />
+          <MetricBox label="Impressions" value={fmt(p.impressions)} exact={exactNumber(p.impressions)} />
+          <MetricBox label="Reach unique" value={fmt(p.reach)} exact={exactNumber(p.reach)} />
           <MetricBox label="Frequency" value={fmtNum(p.frequency, 2)} sub={`target ≤ ${FREQ_TARGET}`} warn={p.frequency > FREQ_TARGET} />
-          <MetricBox label="Viral reach" value={fmt(p.reach_viral)} sub={pct(p.reach_viral, p.reach) != null ? `${pct(p.reach_viral, p.reach, 0)}% spread` : null} />
+          <MetricBox label="Viral reach" value={fmt(p.reach_viral)} exact={exactNumber(p.reach_viral)} sub={pct(p.reach_viral, p.reach) != null ? `${pct(p.reach_viral, p.reach, 0)}% spread` : null} />
         </div>
         {reach > 0 && (
           <div style={{ marginTop: 12 }}>
@@ -386,9 +404,9 @@ const TierPostDetail = ({ post: p, baseline }) => {
               <div style={{ background: '#7C3AED', width: `${(p.reach_viral || 0) / reach * 100}%` }}></div>
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 10 }}>
-              <span><span style={{ color: '#0F766E' }}>●</span> Organic {fmt(p.reach_organic)}</span>
-              <span><span style={{ color: '#C2410C' }}>●</span> Paid {fmt(p.reach_paid)}</span>
-              <span><span style={{ color: '#7C3AED' }}>●</span> Viral {fmt(p.reach_viral)}</span>
+              <span><span style={{ color: '#0F766E' }}>●</span> Organic <ExactValue exact={exactNumber(p.reach_organic)}>{fmt(p.reach_organic)}</ExactValue></span>
+              <span><span style={{ color: '#C2410C' }}>●</span> Paid <ExactValue exact={exactNumber(p.reach_paid)}>{fmt(p.reach_paid)}</ExactValue></span>
+              <span><span style={{ color: '#7C3AED' }}>●</span> Viral <ExactValue exact={exactNumber(p.reach_viral)}>{fmt(p.reach_viral)}</ExactValue></span>
             </div>
           </div>
         )}
@@ -399,9 +417,9 @@ const TierPostDetail = ({ post: p, baseline }) => {
           <SectionTitle num="2" title="Video performance" />
           <div style={{ background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: 14, marginBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-              <MetricBox label="3s views" value={fmt(p.views_3s)} sub={pct(p.views_3s, p.impressions) != null ? `${pct(p.views_3s, p.impressions, 0)}% of impr.` : null} />
-              <MetricBox label="15s views" value={fmt(p.views_15s)} sub={pct(p.views_15s, p.views_3s) != null ? `${pct(p.views_15s, p.views_3s, 0)}% from 3s` : null} />
-              <MetricBox label="Completion" value={fmt(p.views_completion)} sub={pct(p.views_completion, p.views_3s) != null ? `${pct(p.views_completion, p.views_3s, 0)}% finished` : null} />
+              <MetricBox label="3s views" value={fmt(p.views_3s)} exact={exactNumber(p.views_3s)} sub={pct(p.views_3s, p.impressions) != null ? `${pct(p.views_3s, p.impressions, 0)}% of impr.` : null} />
+              <MetricBox label="15s views" value={fmt(p.views_15s)} exact={exactNumber(p.views_15s)} sub={pct(p.views_15s, p.views_3s) != null ? `${pct(p.views_15s, p.views_3s, 0)}% from 3s` : null} />
+              <MetricBox label="Completion" value={fmt(p.views_completion)} exact={exactNumber(p.views_completion)} sub={pct(p.views_completion, p.views_3s) != null ? `${pct(p.views_completion, p.views_3s, 0)}% finished` : null} />
               <MetricBox label="Avg watch" value={p.avg_watch != null ? `${p.avg_watch}s` : 'N/A'} sub={(p.avg_watch != null && p.length) ? `${Math.round(p.avg_watch / p.length * 100)}% of length` : null} />
             </div>
           </div>
@@ -411,24 +429,24 @@ const TierPostDetail = ({ post: p, baseline }) => {
       <SectionTitle num="3" title="Interactions" />
       <div style={{ background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: 14, marginBottom: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14 }}>
-          <MetricBox label="Engagement" value={fmt(p.engagement)} sub={er != null ? `ER ${er.toFixed(1)}%${baseline.ER ? ` · ${(er / baseline.ER).toFixed(1)}× baseline` : ''}` : null} good={er != null && baseline.ER != null && er > baseline.ER} />
-          <MetricBox label="Shares" value={fmt(p.shares)} sub={shareRate != null ? `${shareRate.toFixed(2)}% rate` : null} good />
-          <MetricBox label="Saves" value={fmt(p.saves)} sub={saveRate != null ? `${saveRate.toFixed(2)}% rate` : null} good />
+          <MetricBox label="Engagement" value={fmt(p.engagement)} exact={exactNumber(p.engagement)} sub={er != null ? `ER ${er.toFixed(1)}%${baseline.ER ? ` · ${(er / baseline.ER).toFixed(1)}× baseline` : ''}` : null} good={er != null && baseline.ER != null && er > baseline.ER} />
+          <MetricBox label="Shares" value={fmt(p.shares)} exact={exactNumber(p.shares)} sub={shareRate != null ? `${shareRate.toFixed(2)}% rate` : null} good />
+          <MetricBox label="Saves" value={fmt(p.saves)} exact={exactNumber(p.saves)} sub={saveRate != null ? `${saveRate.toFixed(2)}% rate` : null} good />
         </div>
         {rxnTotal > 0 && (
           <>
-            <div style={{ fontSize: 10, color: '#78716C', marginBottom: 6 }}>Reactions · {fmt(rxnTotal)} total</div>
+            <div style={{ fontSize: 10, color: '#78716C', marginBottom: 6 }}>Reactions · <ExactValue exact={exactNumber(rxnTotal)}>{fmt(rxnTotal)}</ExactValue> total</div>
             <div style={{ display: 'flex', height: 14, borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
               {[{ type: 'like', color: '#3B82F6' }, { type: 'love', color: '#EC4899' }, { type: 'wow', color: '#F59E0B' }, { type: 'haha', color: '#EAB308' }, { type: 'sad', color: '#78716C' }, { type: 'angry', color: '#737373' }].map(r => {
                 const w = (p.reactions[r.type] / rxnTotal) * 100;
-                return <div key={r.type} style={{ background: r.color, width: `${w}%`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'white', fontWeight: 500 }}>{w > 8 ? `${r.type} ${fmt(p.reactions[r.type])}` : ''}</div>;
+                return <div key={r.type} title={`${r.type}: ${exactNumber(p.reactions[r.type])}`} style={{ background: r.color, width: `${w}%`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'white', fontWeight: 500 }}>{w > 8 ? `${r.type} ${fmt(p.reactions[r.type])}` : ''}</div>;
               })}
             </div>
           </>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 10, borderTop: '0.5px solid #F5F5F4' }}>
-          <MetricBox label="Comments" value={p.comments != null ? `${fmt(p.comments)}${p.comment_avg_words ? ` · avg ${p.comment_avg_words} คำ` : ''}` : 'N/A'} sub={p.sentiment != null ? `sentiment ${p.sentiment >= 0 ? '+' : ''}${p.sentiment}` : null} mini />
-          <MetricBox label="Link clicks" value={p.link_clicks != null ? fmt(p.link_clicks) : 'N/A'} sub={p.link_clicks == null ? 'โพสต์ไม่มีลิงก์ / ดึงไม่ได้' : null} mini />
+          <MetricBox label="Comments" value={p.comments != null ? `${fmt(p.comments)}${p.comment_avg_words ? ` · avg ${p.comment_avg_words} คำ` : ''}` : 'N/A'} exact={p.comments != null ? `${exactNumber(p.comments)} comments` : null} sub={p.sentiment != null ? `sentiment ${p.sentiment >= 0 ? '+' : ''}${p.sentiment}` : null} mini />
+          <MetricBox label="Link clicks" value={p.link_clicks != null ? fmt(p.link_clicks) : 'N/A'} exact={exactNumber(p.link_clicks)} sub={p.link_clicks == null ? 'โพสต์ไม่มีลิงก์ / ดึงไม่ได้' : null} mini />
         </div>
       </div>
 
@@ -437,7 +455,7 @@ const TierPostDetail = ({ post: p, baseline }) => {
           <SectionTitle num="4" title={`Ad performance · ${p.objective} only`} />
           <div style={{ background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: 14, marginBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-              <MetricBox label="Spend" value={fmtMoney(p.spend)} />
+              <MetricBox label="Spend" value={fmtMoney(p.spend)} exact={exactMoney(p.spend)} />
               <MetricBox label="CPM" value={p.cpm != null ? `฿${p.cpm}` : 'N/A'} />
               <MetricBox label="CPE" value={p.cpe != null ? `฿${p.cpe}` : 'N/A'} />
               <MetricBox label="ROAS" value={p.roas != null ? `${p.roas}×` : 'N/A'} sub={p.roas == null ? 'ไม่ใช่ conversion' : null} />
@@ -636,6 +654,34 @@ const WorkspaceSidebar = ({ view, setView, onLogout, canLogout }) => {
       </div>
     </aside>
   );
+};
+
+const PeriodControl = ({ value, onChange, onApply, loading }) => {
+  const today = dateInputValue(new Date());
+  const invalid = !value.since || !value.until || value.since > value.until;
+  const applyPreset = days => {
+    const untilDate = new Date();
+    const sinceDate = new Date(untilDate);
+    if (days === 'month') sinceDate.setDate(1);
+    else sinceDate.setDate(sinceDate.getDate() - (days - 1));
+    const next = { since: dateInputValue(sinceDate), until: dateInputValue(untilDate) };
+    onChange(next);
+    onApply(next);
+  };
+
+  return <div className="period-control" aria-label="กำหนดช่วงเวลารายงาน">
+    <div className="period-presets" aria-label="ช่วงเวลาด่วน">
+      {[7, 30, 90].map(days => <button key={days} type="button" onClick={() => applyPreset(days)} disabled={loading}>{days} วัน</button>)}
+      <button type="button" onClick={() => applyPreset('month')} disabled={loading}>เดือนนี้</button>
+    </div>
+    <div className="period-dates">
+      <label><span>ตั้งแต่</span><input type="date" max={value.until || today} value={value.since} onChange={event => onChange({ ...value, since: event.target.value })} /></label>
+      <span className="period-separator" aria-hidden="true">—</span>
+      <label><span>ถึง</span><input type="date" min={value.since} max={today} value={value.until} onChange={event => onChange({ ...value, until: event.target.value })} /></label>
+      <button className="period-apply" type="button" onClick={() => onApply(value)} disabled={loading || invalid}>{loading ? <LoaderCircle className="button-spinner" size={15} /> : <Calendar size={15} />} ใช้ช่วงเวลา</button>
+    </div>
+    {invalid && <div className="period-error" role="alert">วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด</div>}
+  </div>;
 };
 
 const DataSourcesView = ({ loading, onRefresh, facebook, facebookNotice, onFacebookConnect, onFacebookRefresh, onFacebookDisconnect }) => {
@@ -943,13 +989,13 @@ const ReportElementsPanel = ({ project, onOpenPortfolio, onSessionExpiry }) => {
     } catch (err) { if (!onSessionExpiry(err)) setState(current => ({ ...current, error: err.message })); }
   };
 
-  return <section className="report-elements" aria-labelledby="report-elements-title">
+  return <section id="report-elements" className="report-elements" aria-labelledby="report-elements-title">
     <div className="elements-heading"><div><div className="section-kicker">Project workspace</div><h2 id="report-elements-title">Working notes</h2><p>เพิ่มบริบทที่ตัวเลขบอกไม่ได้ และเก็บ Next step ไว้กับ Project นี้โดยตรง</p></div>{project && <span className="project-context-chip">{project.name}</span>}</div>
     {!project ? <div className="elements-locked"><FolderKanban size={21} /><div><strong>เลือก Project ก่อนเพิ่มข้อความ</strong><span>การบังคับ scope ช่วยป้องกันโน้ตของหลายแบรนด์ปะปนกัน</span></div><button className="secondary-action" type="button" onClick={onOpenPortfolio}>ตั้งค่า Project</button></div> : <>
       <form className="element-composer" onSubmit={submit}>
         <div className="kind-selector" role="radiogroup" aria-label="ชนิดข้อความ">{Object.entries(ELEMENT_KINDS).map(([id, config]) => { const Icon = config.icon; return <button key={id} type="button" role="radio" aria-checked={form.kind === id} className={form.kind === id ? 'active' : ''} onClick={() => setForm({ ...form, kind: id })}><Icon size={15} />{config.label}</button>; })}</div>
         <input aria-label="หัวข้อข้อความ" maxLength="160" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} placeholder="หัวข้อ (ไม่บังคับ)" />
-        <textarea aria-label="เนื้อหาข้อความ" required maxLength="12000" rows="4" value={form.content} onChange={event => setForm({ ...form, content: event.target.value })} placeholder="เขียนข้อสังเกต คีย์สำคัญ หรือสิ่งที่ต้องทำต่อ..." />
+        <textarea id="analysis-comment-input" aria-label="เนื้อหาข้อความ" required maxLength="12000" rows="4" value={form.content} onChange={event => setForm({ ...form, content: event.target.value })} placeholder="เขียนข้อสังเกต คีย์สำคัญ หรือสิ่งที่ต้องทำต่อ..." />
         <div className="composer-footer"><span>{form.content.length.toLocaleString()} / 12,000</span><button className="primary-action" type="submit" disabled={saving || !form.content.trim()}>{saving ? <LoaderCircle className="button-spinner" size={16} /> : <Plus size={16} />} เพิ่มในรายงาน</button></div>
       </form>
       {state.error && <div className="inline-error" role="alert"><AlertCircle size={15} />{state.error}<button type="button" onClick={loadElements}>โหลดใหม่</button></div>}
@@ -1026,6 +1072,8 @@ export default function Dashboard() {
   const [tier, setTier] = useState('overview');
   const [selectedPost, setSelectedPost] = useState(null);
   const [mode, setMode] = useState('combined');
+  const [periodDraft, setPeriodDraft] = useState(defaultPeriod);
+  const [periodApplied, setPeriodApplied] = useState(defaultPeriod);
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [portfolio, setPortfolio] = useState({ loading: true, error: null, data: null });
   const [selectedProjectId, setSelectedProjectId] = useState(null);
@@ -1080,13 +1128,13 @@ export default function Dashboard() {
     if (!appReady) return undefined;
     let alive = true;
     setState({ loading: true, error: null, data: null });
-    fetchAnalysis()
+    fetchAnalysis(periodApplied)
       .then(data => { if (alive) setState({ loading: false, error: null, data }); })
       .catch(err => {
         if (alive && !handleSessionExpiry(err)) setState({ loading: false, error: err.message, data: null });
       });
     return () => { alive = false; };
-  }, [refreshKey, appReady]);
+  }, [refreshKey, appReady, periodApplied]);
 
   const loadPortfolio = () => {
     setPortfolio(current => ({ ...current, loading: true, error: null }));
@@ -1128,6 +1176,18 @@ export default function Dashboard() {
   };
 
   const handleSelect = (post) => { setSelectedPost(post); setTier('post'); };
+  const handlePeriodApply = nextPeriod => {
+    if (!nextPeriod.since || !nextPeriod.until || nextPeriod.since > nextPeriod.until) return;
+    setSelectedPost(null);
+    setTier('overview');
+    setPeriodApplied(nextPeriod);
+    setRefreshKey(key => key + 1);
+  };
+  const focusAnalysisComment = () => {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById('report-elements')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    window.setTimeout(() => document.getElementById('analysis-comment-input')?.focus(), 420);
+  };
   const handleFacebookConnect = async () => {
     setFacebook(current => ({ ...current, connecting: true, error: null }));
     setFacebookNotice(null);
@@ -1219,12 +1279,17 @@ export default function Dashboard() {
                     {data ? `${data.counts.total} posts · ${data.counts.boosted} boosted · ${data.counts.ads} pure ads · ${data.range.since} – ${data.range.until}` : 'กำลังเชื่อมต่อ backend...'}
                   </p>
                 </div>
-                <div className="mode-switch" aria-label="เลือกประเภทข้อมูล">
-                  {[{ id: 'combined', label: 'รวม' }, { id: 'organic', label: 'Organic' }, { id: 'paid', label: 'Paid' }].map(m => (
-                    <button key={m.id} className={mode === m.id ? 'active' : ''} onClick={() => setMode(m.id)}>{m.label}</button>
-                  ))}
+                <div className="report-header-actions">
+                  <button className="secondary-action comment-jump" type="button" onClick={focusAnalysisComment}><MessageSquareText size={15} /> เพิ่มคอมเมนต์</button>
+                  <div className="mode-switch" aria-label="เลือกประเภทข้อมูล">
+                    {[{ id: 'combined', label: 'รวม' }, { id: 'organic', label: 'Organic' }, { id: 'paid', label: 'Paid' }].map(m => (
+                      <button key={m.id} className={mode === m.id ? 'active' : ''} onClick={() => setMode(m.id)}>{m.label}</button>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              <PeriodControl value={periodDraft} onChange={setPeriodDraft} onApply={handlePeriodApply} loading={loading} />
 
               <nav className="tier-nav" aria-label="Report depth">
                 {tier !== 'overview' && (

@@ -93,10 +93,13 @@ dev: vite proxy `/api` → `localhost:8000` (ดู `frontend/vite.config.js`) �
 
 ## การใช้งาน
 
-1. **Sidebar** — เลือก date range, mode (All/Organic/Paid), กด "Load / Refresh data"
-2. **Tier 1 (Overview)** — ภาพรวม, top posts, format chart, heatmap, AI insights
-3. **Tier 2 (Ads vs Organic)** — เปรียบเทียบแยกฝั่ง, correlation, creative pattern, cost efficiency
-4. **Tier 3 (Post deep-dive)** — คลิกโพสต์ใน sidebar หรือใน table
+1. **Period** — เลือก 7/30/90 วัน, เดือนปัจจุบัน หรือกำหนดวันเริ่มต้นและวันสิ้นสุดเอง ระบบส่งช่วงนี้เข้า API จริง
+2. **Mode** — เลือก รวม/Organic/Paid โดยไม่เปลี่ยนช่วงเวลาที่กำลังวิเคราะห์
+3. **ตัวเลขแบบย่อ** — วางเมาส์หรือโฟกัสค่าที่มีเส้นประ เช่น `312K` เพื่อดูเลขเต็ม
+4. **Working notes** — กด "เพิ่มคอมเมนต์" เพื่อเพิ่ม Text box, Comment, Key takeaway หรือ Next step ที่ผูกกับ Project
+5. **Tier 1 (Overview)** — ภาพรวม, top posts, format chart, heatmap, AI insights
+6. **Tier 2 (Ads vs Organic)** — เปรียบเทียบแยกฝั่ง, correlation, creative pattern, cost efficiency
+7. **Tier 3 (Post deep-dive)** — คลิกโพสต์ใน sidebar หรือใน table
    - metrics ครบทุก category
    - health check (green/amber/red)
    - score breakdown พร้อม reasoning
