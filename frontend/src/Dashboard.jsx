@@ -44,6 +44,11 @@ const shareTokenFromLocation = () => {
   const token = new URLSearchParams(window.location.search).get('share');
   return token && /^[A-Za-z0-9_-]{32,120}$/.test(token) ? token : null;
 };
+const sharedContentIdFromLocation = () => {
+  if (typeof window === 'undefined') return null;
+  const value = new URLSearchParams(window.location.search).get('content');
+  return value && value.length <= 160 ? value : null;
+};
 const reportUrl = period => {
   const url = new URL(window.location.href);
   url.search = '';
@@ -1516,17 +1521,58 @@ const PublicReportView = ({ token }) => {
   const [state, setState] = useState({ loading: true, error: null, snapshot: null });
   const [section, setSection] = useState('overview');
   const [selectedPost, setSelectedPost] = useState(null);
+  const [contentLinkCopied, setContentLinkCopied] = useState(false);
   useEffect(() => {
     let alive = true;
     fetchPublicReport(token)
-      .then(snapshot => { if (alive) setState({ loading: false, error: null, snapshot }); })
+      .then(snapshot => {
+        if (!alive) return;
+        const requested = sharedContentIdFromLocation();
+        const post = requested ? snapshot.report.posts.find(item => item.id === requested) : null;
+        setSelectedPost(post || null);
+        setSection(post ? 'post' : 'overview');
+        setState({ loading: false, error: null, snapshot });
+      })
       .catch(error => { if (alive) setState({ loading: false, error: error.message, snapshot: null }); });
     return () => { alive = false; };
   }, [token]);
+  useEffect(() => {
+    const restore = () => {
+      const requested = sharedContentIdFromLocation();
+      const post = requested ? state.snapshot?.report?.posts?.find(item => item.id === requested) : null;
+      setSelectedPost(post || null);
+      setSection(post ? 'post' : 'content');
+    };
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, [state.snapshot]);
   if (state.loading) return <main className="client-report-shell" style={fontStyle}><div className="client-report-state"><LoaderCircle className="button-spinner" size={18} /> กำลังเปิดรายงาน...</div></main>;
   if (state.error) return <main className="client-report-shell" style={fontStyle}><div className="client-report-state error"><AlertCircle size={18} /><strong>เปิดรายงานไม่ได้</strong><span>{state.error}</span></div></main>;
   const data = state.snapshot.report;
-  const openPost = post => { setSelectedPost(post); setSection('post'); window.scrollTo({ top: 0, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); };
+  const openPost = post => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('content', post.id);
+    window.history.pushState({}, '', url);
+    setSelectedPost(post);
+    setSection('post');
+    window.scrollTo({ top: 0, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  };
+  const closePost = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('content');
+    window.history.pushState({}, '', url);
+    setSelectedPost(null);
+    setSection('content');
+  };
+  const copyContentLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setContentLinkCopied(true);
+      window.setTimeout(() => setContentLinkCopied(false), 2000);
+    } catch {
+      setContentLinkCopied(false);
+    }
+  };
   return <main className="client-report-shell" style={fontStyle}>
     <header className="client-report-header">
       <div><div className="client-report-brand">Report Analysis</div><h1>{data.scope?.project_name || data.page?.name}</h1><p>{data.scope?.period_label || `${data.range.since} — ${data.range.until}`} · Snapshot อ่านอย่างเดียว</p></div>
@@ -1542,7 +1588,7 @@ const PublicReportView = ({ token }) => {
     {section === 'overview' && <><TierOverview data={data} mode="combined" onSelectPost={openPost} /><CampaignResultsTable data={data} readOnly /></>}
     {section === 'content' && <ClientContentIndex posts={data.posts} onSelect={openPost} />}
     {section === 'split' && <section className="client-report-section"><h2>Ads vs Organic</h2><TierAdsOrganic data={data} /></section>}
-    {section === 'post' && selectedPost && <section className="client-post-detail"><button className="secondary-action" type="button" onClick={() => setSection('content')}><ArrowLeft size={14} /> กลับไป Content ทั้งหมด</button><TierPostDetail post={selectedPost} baseline={data.baseline} /></section>}
+    {section === 'post' && selectedPost && <section className="client-post-detail"><div className="client-post-actions"><button className="secondary-action" type="button" onClick={closePost}><ArrowLeft size={14} /> กลับไป Content ทั้งหมด</button><button className="secondary-action" type="button" onClick={copyContentLink}>{contentLinkCopied ? <Check size={14} /> : <Link2 size={14} />} {contentLinkCopied ? 'คัดลอกแล้ว' : 'คัดลอกลิงก์คอนเทนต์นี้'}</button></div><TierPostDetail post={selectedPost} baseline={data.baseline} /></section>}
   </main>;
 };
 
