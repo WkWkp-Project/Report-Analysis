@@ -1,23 +1,41 @@
 services:
   report-analysis:
     build: .
+    init: true
     ports:
-      - "8000:8000"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8000}:8000"
     environment:
+      APP_ENV: production
       APP_DATA_DIR: /app/data
-      ALLOWED_ORIGINS: http://localhost:8000
+      APP_AUTH_PASSWORD: ${APP_AUTH_PASSWORD:?Run python scripts/generate_env.py first}
+      APP_SESSION_SECRET: ${APP_SESSION_SECRET:?Run python scripts/generate_env.py first}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8000}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8000}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8000}
       FB_REDIRECT_URI: ${FB_REDIRECT_URI:-http://localhost:8000/api/facebook/oauth/callback}
       FB_APP_ID: ${FB_APP_ID:-}
       FB_APP_SECRET: ${FB_APP_SECRET:-}
       FB_GRAPH_API_VERSION: ${FB_GRAPH_API_VERSION:-v25.0}
-      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?Run python scripts/generate_env.py first}
       FB_PAGE_ACCESS_TOKEN: ${FB_PAGE_ACCESS_TOKEN:-}
       FB_PAGE_ID: ${FB_PAGE_ID:-}
       FB_AD_ACCOUNT_ID: ${FB_AD_ACCOUNT_ID:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
     volumes:
-      - ./data:/app/data
+      - report-analysis-data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 200
+    mem_limit: 1g
+    cpus: 2.0
     restart: unless-stopped
+
+volumes:
+  report-analysis-data:
+    name: report-analysis-data

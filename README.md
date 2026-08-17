@@ -16,69 +16,56 @@ fb_analyzer/
 └── README.md
 ```
 
-## Setup
+## เริ่มใช้งาน
 
-### 1. Clone / copy ไฟล์
+### Production / NAS — แนะนำ
+
+ถ้ามี Python อยู่แล้ว รัน:
+
 ```bash
-mkdir fb_analyzer && cd fb_analyzer
-# วางไฟล์ทั้งหมดที่นี่
+python scripts/generate_env.py
+docker compose up --build -d
 ```
 
-### 2. Install dependencies
+ถ้าเครื่องปลายทางมีเพียง Docker ให้สร้าง `.env` ผ่าน container ชั่วคราวแทน:
+
 ```bash
-pip install -r requirements.txt
+docker run --rm -v "${PWD}:/workspace" -w /workspace python:3.12.13-slim-bookworm python scripts/generate_env.py
+docker compose up --build -d
 ```
 
-### 3. ตั้งค่า .env
+เปิด `http://localhost:8000` และใช้รหัสผ่าน workspace ที่ generator แสดง ระบบ build React และรัน FastAPI ใน container เดียว ข้อมูล runtime แยกอยู่ใน Docker volume `report-analysis-data` โดยไม่ต้องติดตั้ง Node, Python หรือฐานข้อมูลบนเครื่องปลายทาง
+
+ค่าเริ่มต้น bind เฉพาะ `127.0.0.1` เพื่อไม่เปิดพอร์ตสู่ LAN โดยไม่ตั้งใจ หากใช้ reverse proxy บน NAS ให้ชี้ proxy มาที่ `127.0.0.1:8000` และรัน generator ด้วย public HTTPS URL:
+
 ```bash
-cp .env.example .env
-# แก้ไข .env ใส่ token จริง
+python scripts/generate_env.py --base-url https://reports.example.com
 ```
 
-### 4. ขอ Facebook Access Token
-1. ไปที่ [Graph API Explorer](https://developers.facebook.com/tools/explorer/)
-2. เลือก App ที่สร้างไว้ (หรือสร้างใหม่ที่ developers.facebook.com)
-3. เลือก **User or Page** → เลือกเพจที่ต้องการ
-4. เพิ่ม permissions:
-   - `pages_read_engagement`
-   - `pages_read_user_content`
-   - `read_insights`
-   - `pages_show_list`
-   - `ads_read` (ถ้าต้องการ ad data)
-5. Generate Token → Copy ใส่ `.env`
+ก่อนย้ายเครื่องต้องสำรองทั้ง `.env` และ Docker volume เพราะ token ที่เข้ารหัสจะถอดได้ด้วย `TOKEN_ENCRYPTION_KEY` ใน `.env` เท่านั้น
 
-> **หมายเหตุ:** Token ที่ได้จาก Explorer มีอายุ 1 ชั่วโมง
-> สำหรับใช้งานจริง ให้ exchange เป็น long-lived token:
-> `GET https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&...`
+### Development
 
-### 5. รัน
-
-**ทางเลือก A — Streamlit (เดิม)**
 ```bash
-streamlit run app.py
-```
-เปิด browser ที่ `http://localhost:8501`
-> ยังไม่มี FB token? กดปุ่ม **📊 โหลด demo data** ใน sidebar
-> จะรัน scoring/analyzer pipeline จริงบนข้อมูลตัวอย่างได้ทันที
-
-**ทางเลือก B — REST API + React frontend (แนะนำ)**
-
-backend (terminal 1):
-```bash
-uvicorn server:app --reload --port 8000
+python -m pip install -r requirements.txt
+python -m uvicorn server:app --reload --port 8000
 ```
 
-frontend (terminal 2):
+อีก terminal:
+
 ```bash
 cd frontend
-npm install        # ครั้งแรกเท่านั้น
+npm ci
 npm run dev
 ```
-เปิด browser ที่ `http://localhost:5173`
 
-> ถ้ายังไม่ได้ตั้ง `.env` (ไม่มี FB token) backend จะ fallback เป็น **demo data**
-> โดยรัน scoring/analyzer pipeline จริงบนข้อมูลตัวอย่าง — frontend ทำงานได้ครบทันที
-> เมื่อใส่ token จริงแล้ว API จะดึงจาก Graph API อัตโนมัติ
+เปิด `http://localhost:5173` หากยังไม่สร้าง `.env` ระบบ development จะใช้ demo data และอนุญาตเฉพาะการใช้งาน local; `APP_ENV=production` จะไม่ยอมเริ่มหากยังไม่มีรหัสผ่านและ session secret
+
+### Streamlit เดิม
+
+ติดตั้ง `python -m pip install -r requirements-dev.txt` แล้วใช้ `streamlit run app.py` เพื่ออ้างอิงหน้าจอเดิมและทดลองภายในเครื่องเท่านั้น ห้าม publish พอร์ต `8501` เพราะเส้นทางนี้ไม่มี authentication layer ของ production app และ dependency ชุดนี้ไม่ถูกติดตั้งใน production image
+
+การสร้าง Meta App และเชื่อม OAuth ทำหลัง security gate ผ่านแล้ว ดู [FACEBOOK_CONNECTION.md](FACEBOOK_CONNECTION.md)
 
 #### สถาปัตยกรรม (ทางเลือก B)
 ```

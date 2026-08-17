@@ -1,0 +1,10 @@
+-r requirements.txt
+
+# Legacy Streamlit reference surface (local only)
+streamlit==1.57.0
+pandas==3.0.3
+plotly==6.7.0
+
+# Reserved for the file-import implementation stage
+openpyxl==3.1.5
+python-multipart==0.0.29

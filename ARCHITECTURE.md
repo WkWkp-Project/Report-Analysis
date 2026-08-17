@@ -27,8 +27,10 @@ Development ยังคงแยก Vite `:5173` และ FastAPI `:8000` เ�
 ### Level 1 — Single machine / small team
 
 - Docker Compose หนึ่ง service
-- persistent volume `./data:/app/data`
-- API credentials ผ่าน `.env`
+- named volume `report-analysis-data` mount ที่ `/app/data`
+- secret และ runtime config อยู่ใน `.env` ไฟล์เดียว
+- signed HttpOnly session ป้องกัน API ทุกเส้นทางที่อ่านหรือแก้ข้อมูล
+- container รันด้วย non-root user, read-only filesystem และไม่มี Linux capabilities
 - เหมาะกับ demo, internal use และข้อมูลขนาดเล็ก
 
 ### Level 2 — Managed production
@@ -57,3 +59,14 @@ Development ยังคงแยก Vite `:5173` และ FastAPI `:8000` เ�
 4. Blend ได้เมื่อ granularity และ join keys ผ่าน validation เท่านั้น
 5. AI อ่านได้เฉพาะ dataset สถานะ `analysis_ready`
 6. การ rerun ต้องอ้าง manifest/version เดิมเพื่อ reproduce รายงานได้
+
+## Level 1 data boundary
+
+ระบบยังไม่ต้องใช้ SQL ในช่วงก่อนยื่น Meta API ข้อมูลแยกเป็นสองส่วนชัดเจน:
+
+- `.env` — รหัสผ่านและ encryption keys; สำรองแบบ secret และห้าม commit
+- `report-analysis-data` — encrypted Facebook connection และ dataset/runtime files; สำรองเป็น volume
+
+ต้องมีทั้งสองส่วนเมื่อต้อง restore เครื่องใหม่ การลบ container หรือ rebuild image ไม่ลบ named volume แต่ `docker compose down -v` จะลบข้อมูล จึงห้ามใช้คำสั่งนี้กับระบบจริงโดยไม่มี backup
+
+Streamlit (`app.py`) ไม่ถูก copy เข้า production image และไม่อยู่หลัง authentication middleware ใช้ได้เฉพาะการทดลอง local เท่านั้น
