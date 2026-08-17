@@ -200,7 +200,7 @@ class PortfolioApiSecurityTests(unittest.TestCase):
 
         override = self.client.patch(
             f"/api/projects/{project_id}/campaign-metrics",
-            json={"period_id": period["id"], "campaign_id": campaign["id"], "values": {"revenue": 9999}, "reason": "Matched CRM total"},
+            json={"period_id": period["id"], "campaign_id": campaign["id"], "values": {"revenue": 9999}, "reason": "Matched CRM total", "acknowledge_warnings": True},
         )
         self.assertEqual(override.status_code, 200)
         custom = self.client.post(
@@ -241,7 +241,7 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         self.assertEqual(analysis.json()["campaign_results"][0]["campaign_id"], "report_total")
         override = self.client.patch(
             f"/api/projects/{report_id}/campaign-metrics",
-            json={"period_id": report_id, "campaign_id": "report_total", "values": {"revenue": 54321}, "reason": "Matched sales file"},
+            json={"period_id": report_id, "campaign_id": "report_total", "values": {"revenue": 54321}, "reason": "Matched sales file", "acknowledge_warnings": True},
         )
         self.assertEqual(override.status_code, 200)
         refreshed = self.client.get(f"/api/analyze?demo=1&report_id={report_id}").json()

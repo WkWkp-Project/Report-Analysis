@@ -40,6 +40,7 @@ class MetricOverrideUpsert(StrictModel):
     campaign_id: str = Field(min_length=1, max_length=80)
     values: dict[str, float | None] = Field(min_length=1, max_length=len(EDITABLE_METRICS))
     reason: str = Field(min_length=3, max_length=500)
+    acknowledge_warnings: bool = False
 
     @field_validator("values")
     @classmethod
@@ -84,18 +85,25 @@ class MetricWorkspaceStore:
         self.path = root / "metrics" / "workspace.json"
         self._lock = threading.RLock()
 
-    def upsert_override(self, project_id: str, payload: MetricOverrideUpsert) -> dict:
+    def upsert_override(self, project_id: str, payload: MetricOverrideUpsert, base_values: dict | None = None) -> dict:
         with self._lock:
             data = self._load()
             key = f"{project_id}:{payload.period_id}:{payload.campaign_id}"
             current = data["overrides"].get(key, {})
             current_values = {**current.get("values", {}), **payload.values}
+            candidate = {**(base_values or {}), **current_values}
+            errors, warnings = validate_metric_consistency(candidate, base_values or {}, set(payload.values))
+            if errors:
+                raise MetricWorkspaceError("; ".join(errors))
+            if warnings and not payload.acknowledge_warnings:
+                raise MetricWorkspaceError("ต้องยืนยันคำเตือนก่อนบันทึก: " + "; ".join(warnings))
             data["overrides"][key] = {
                 "project_id": project_id,
                 "period_id": payload.period_id,
                 "campaign_id": payload.campaign_id,
                 "values": current_values,
                 "reason": payload.reason,
+                "validation_warnings": warnings,
                 "updated_at": _now(),
             }
             self._save(data)
@@ -182,6 +190,36 @@ def calculate_derived(row: dict) -> dict:
         "roas": _ratio(revenue, spend),
         "roi": round((revenue - spend) / spend * 100, 2) if revenue is not None and spend else None,
     }
+
+
+def validate_metric_consistency(candidate: dict, previous: dict | None = None, changed: set[str] | None = None) -> tuple[list[str], list[str]]:
+    errors, warnings = [], []
+    changed = changed or set(EDITABLE_METRICS)
+    count_metrics = {"reach", "impressions", "engagement", "link_clicks", "purchases"}
+    for key in changed:
+        value = _number(candidate.get(key))
+        if value is not None and value < 0:
+            errors.append(f"{key} ต้องไม่ติดลบ")
+        if key in count_metrics and value is not None and not value.is_integer():
+            errors.append(f"{key} ต้องเป็นจำนวนเต็ม")
+    impressions, reach = _number(candidate.get("impressions")), _number(candidate.get("reach"))
+    engagement, clicks = _number(candidate.get("engagement")), _number(candidate.get("link_clicks"))
+    purchases, revenue = _number(candidate.get("purchases")), _number(candidate.get("revenue"))
+    if impressions is not None and reach is not None and reach > impressions:
+        errors.append("Reach ต้องไม่มากกว่า Impressions")
+    if impressions is not None and clicks is not None and clicks > impressions:
+        errors.append("Link clicks ต้องไม่มากกว่า Impressions")
+    if engagement is not None and reach is not None and engagement > reach:
+        warnings.append("Engagement สูงกว่า Reach")
+    if purchases and not revenue:
+        warnings.append("มี Purchases แต่ Revenue เป็นศูนย์หรือไม่มีข้อมูล")
+    if revenue and not purchases:
+        warnings.append("มี Revenue แต่ Purchases เป็นศูนย์หรือไม่มีข้อมูล")
+    for key in changed:
+        before = _number((previous or {}).get(key)); after = _number(candidate.get(key))
+        if before and after is not None and (after >= before * 1.5 or after <= before * 0.5):
+            warnings.append(f"{key} เปลี่ยนตั้งแต่ 50%")
+    return list(dict.fromkeys(errors)), list(dict.fromkeys(warnings))
 
 
 def validate_formula(formula: str) -> None:

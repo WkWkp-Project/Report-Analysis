@@ -7,6 +7,7 @@ from metric_workspace import (
     MetricOverrideUpsert,
     MetricWorkspaceStore,
     evaluate_formula,
+    MetricWorkspaceError,
 )
 
 
@@ -48,6 +49,21 @@ class MetricWorkspaceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             evaluate_formula("__import__('os')", {})
         self.assertIsNone(evaluate_formula("revenue / spend", {"revenue": 10, "spend": 0}))
+
+    def test_override_blocks_impossible_relationship_and_requires_warning_ack(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MetricWorkspaceStore(Path(directory))
+            base = {"impressions": 1000, "reach": 800, "engagement": 100, "link_clicks": 40, "purchases": 4, "revenue": 400}
+            with self.assertRaisesRegex(MetricWorkspaceError, "Reach"):
+                store.upsert_override("prj_aaaaaaaaaaaaaaaa", MetricOverrideUpsert(period_id="rpd_period", campaign_id="cmp_campaign", values={"reach": 1200}, reason="source correction"), base)
+            with self.assertRaisesRegex(ValueError, "cannot be negative"):
+                MetricOverrideUpsert(period_id="rpd_period", campaign_id="cmp_campaign", values={"spend": -1}, reason="source correction")
+            with self.assertRaisesRegex(MetricWorkspaceError, "จำนวนเต็ม"):
+                store.upsert_override("prj_aaaaaaaaaaaaaaaa", MetricOverrideUpsert(period_id="rpd_period", campaign_id="cmp_campaign", values={"purchases": 4.5}, reason="source correction"), base)
+            with self.assertRaisesRegex(MetricWorkspaceError, "ยืนยันคำเตือน"):
+                store.upsert_override("prj_aaaaaaaaaaaaaaaa", MetricOverrideUpsert(period_id="rpd_period", campaign_id="cmp_campaign", values={"revenue": 2000}, reason="source correction"), base)
+            saved = store.upsert_override("prj_aaaaaaaaaaaaaaaa", MetricOverrideUpsert(period_id="rpd_period", campaign_id="cmp_campaign", values={"revenue": 2000}, reason="verified against CRM", acknowledge_warnings=True), base)
+            self.assertTrue(saved["validation_warnings"])
 
 
 if __name__ == "__main__":

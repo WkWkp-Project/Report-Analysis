@@ -376,8 +376,34 @@ label:focus-within {
 .funnel-metric-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; letter-spacing: .035em; text-transform: uppercase; }
 .funnel-metric-head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .funnel-metric-head small { flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; background: var(--canvas); color: var(--faint); font-size: 9px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.metric-card-edit { flex:0 0 auto; width:26px; height:26px; display:grid; place-items:center; margin-inline-start:auto; padding:0; border:1px solid #dedbd5; border-radius:7px; background:#fff; color:#68625d; cursor:pointer; }
+.metric-card-edit:hover { border-color:#0f766e; background:#f0fdfa; color:#0f766e; }
+.metric-card-edit:focus-visible { outline:3px solid rgba(15,118,110,.18); outline-offset:2px; }
 .funnel-metric-value { margin-top: 6px; color: var(--ink); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: clamp(18px, 2vw, 23px); font-weight: 500; line-height: 1.2; }
 .funnel-metric-sub { min-height: 15px; margin-top: 5px; color: var(--faint); font-size: 10px; line-height: 1.5; }
+.card-metric-editor { margin:0 0 18px; padding:16px 18px; border:1px solid #9ac9bf; border-radius:12px; background:#fff; box-shadow:0 8px 24px rgba(28,25,23,.07); }
+.card-editor-heading { display:flex; justify-content:space-between; gap:16px; margin-bottom:14px; }
+.card-editor-heading h2 { margin:0 0 3px; font-size:15px; }
+.card-editor-heading p { margin:0; color:#68625d; font-size:11px; }
+.card-editor-heading > button { width:30px; height:30px; display:grid; place-items:center; padding:0; border:1px solid #e7e5e4; border-radius:7px; background:#fff; color:#68625d; }
+.card-metric-editor > label { display:flex; flex-direction:column; gap:5px; margin-bottom:12px; color:#57534e; font-size:10px; font-weight:600; }
+.card-metric-editor select, .card-metric-editor input { min-height:38px; padding:8px 10px; border:1px solid #d6d3d1; border-radius:7px; background:#fff; color:#292524; font:inherit; }
+.card-editor-grid { display:grid; grid-template-columns:160px 180px minmax(240px,1fr); gap:10px; }
+.card-editor-grid label { display:flex; flex-direction:column; gap:5px; color:#57534e; font-size:10px; font-weight:600; }
+.card-editor-grid label > strong { min-height:38px; display:flex; align-items:center; padding:8px 10px; border-radius:7px; background:#f5f5f4; color:#292524; font:600 12px/1.4 "IBM Plex Mono",monospace; }
+.metric-validation { display:flex; align-items:flex-start; gap:8px; margin-top:12px; padding:10px 11px; border-radius:9px; font-size:11px; }
+.metric-validation svg { flex:0 0 auto; margin-top:1px; }
+.metric-validation > div { display:flex; flex-direction:column; gap:3px; }
+.metric-validation.error { background:#fff1f2; color:#991b1b; }
+.metric-validation.warning { background:#fffbeb; color:#92400e; }
+.metric-validation.warning label { display:flex; align-items:center; gap:7px; margin-top:5px; font-weight:600; }
+.derived-preview { display:flex; align-items:center; gap:6px; margin-top:12px; padding-top:12px; border-top:1px solid #e7e5e4; overflow-x:auto; }
+.derived-preview > span { margin-inline-end:4px; color:#68625d; font-size:10px; white-space:nowrap; }
+.derived-preview > div { min-width:78px; padding:7px 8px; border-radius:7px; background:#f5f5f4; }
+.derived-preview small { display:block; color:#817a74; font-size:8px; }
+.derived-preview strong { display:block; margin-top:2px; color:#292524; font:600 11px/1.3 "IBM Plex Mono",monospace; }
+.card-editor-actions { display:flex; justify-content:flex-end; gap:7px; margin-top:13px; }
+.card-editor-actions button { min-height:36px; display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:7px 11px; border:1px solid #d6d3d1; border-radius:8px; background:#fff; color:#57534e; }
 .campaign-results { margin: 24px 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
 .campaign-results-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
 .campaign-results-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 600; }
@@ -861,6 +887,9 @@ label:focus-within {
   .funnel-group:nth-child(2) .funnel-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .funnel-metric { padding: 12px; }
   .funnel-metric-head { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .metric-card-edit { position:absolute; inset-block-start:10px; inset-inline-end:10px; }
+  .funnel-metric { position:relative; }
+  .card-editor-grid { grid-template-columns:1fr; }
 
   .report-content [style*="grid-template-columns: 180px 1fr 60px"] {
     grid-template-columns: minmax(105px, 1fr) 1fr 48px !important;

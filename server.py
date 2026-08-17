@@ -865,7 +865,20 @@ def update_campaign_metrics(project_id: str, payload: MetricOverrideUpsert, requ
     else:
         _resolve_analysis_scope(project_id, payload.period_id, [payload.campaign_id])
     try:
-        return metric_workspace_store.upsert_override(project_id, payload)
+        if project_id.startswith("rpt_") or payload.period_id.startswith("rpt_"):
+            report = report_library_store.get(project_id if project_id.startswith("rpt_") else payload.period_id)["report"]
+            metric_payload = _demo_payload(date.fromisoformat(report["date_from"]), date.fromisoformat(report["date_to"]), _library_analysis_scope(report))
+            if not metric_payload.get("scope"):
+                metric_payload["report"] = report
+                _attach_report_total(metric_payload, report)
+        else:
+            portfolio = portfolio_store.snapshot()
+            period = next(item for item in portfolio.periods if item.id == payload.period_id)
+            metric_payload = _demo_payload(period.date_from, period.date_to, _resolve_analysis_scope(project_id, payload.period_id, [payload.campaign_id]))
+        base_row = next(item for item in metric_payload["campaign_results"] if item["campaign_id"] == payload.campaign_id)
+        return metric_workspace_store.upsert_override(project_id, payload, base_values=base_row)
+    except (StopIteration, PortfolioError):
+        raise HTTPException(status_code=422, detail="ไม่พบข้อมูลฐานสำหรับตรวจสอบ metric")
     except MetricWorkspaceError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

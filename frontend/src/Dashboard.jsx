@@ -191,25 +191,26 @@ const RecBlock = ({ icon, title, color, bg, textColor, items }) => (
   </div>
 );
 
-const FunnelMetric = ({ label, value, exact, sub, source }) => (
+const FunnelMetric = ({ label, value, exact, sub, source, editableKey, onEdit }) => (
   <div className="funnel-metric">
     <div className="funnel-metric-head">
       <span>{label}</span>
       <small>{source}</small>
+      {editableKey && onEdit && <button className="metric-card-edit" type="button" onClick={() => onEdit({ key: editableKey, label })} aria-label={`แก้ไข ${label}`} title={`แก้ไข ${label}`}><Pencil size={12} /></button>}
     </div>
     <div className="funnel-metric-value"><ExactValue exact={exact}>{value}</ExactValue></div>
     <div className="funnel-metric-sub">{sub || '\u00a0'}</div>
   </div>
 );
 
-const FunnelGroup = ({ title, description, metrics }) => (
+const FunnelGroup = ({ title, description, metrics, onEditMetric }) => (
   <section className="funnel-group" aria-label={title}>
     <header>
       <h3>{title}</h3>
       <p>{description}</p>
     </header>
     <div className="funnel-metric-grid">
-      {metrics.map(metric => <FunnelMetric key={metric.label} {...metric} />)}
+      {metrics.map(metric => <FunnelMetric key={metric.label} {...metric} onEdit={onEditMetric} />)}
     </div>
   </section>
 );
@@ -231,6 +232,57 @@ const campaignMetricValue = (key, value, definition) => {
   return fmt(value);
 };
 
+const metricPreview = row => {
+  const ratio = (a, b, scale = 1) => a != null && b ? Number((a / b * scale).toFixed(2)) : null;
+  return { frequency: ratio(row.impressions, row.reach), er: ratio(row.engagement, row.reach, 100), ctr: ratio(row.link_clicks, row.impressions, 100), cpm: ratio(row.spend, row.impressions, 1000), cpe: ratio(row.spend, row.engagement), roas: ratio(row.revenue, row.spend), roi: row.revenue != null && row.spend ? Number(((row.revenue - row.spend) / row.spend * 100).toFixed(2)) : null };
+};
+const validateMetricCandidate = (candidate, previous, key) => {
+  const errors = [], warnings = [];
+  const value = Number(candidate[key]);
+  if (Number.isFinite(value) && value < 0) errors.push(`${key} ต้องไม่ติดลบ`);
+  if (['reach', 'impressions', 'engagement', 'link_clicks', 'purchases'].includes(key) && Number.isFinite(value) && !Number.isInteger(value)) errors.push(`${key} ต้องเป็นจำนวนเต็ม`);
+  if (candidate.reach != null && candidate.impressions != null && candidate.reach > candidate.impressions) errors.push('Reach ต้องไม่มากกว่า Impressions');
+  if (candidate.link_clicks != null && candidate.impressions != null && candidate.link_clicks > candidate.impressions) errors.push('Link clicks ต้องไม่มากกว่า Impressions');
+  if (candidate.engagement != null && candidate.reach != null && candidate.engagement > candidate.reach) warnings.push('Engagement สูงกว่า Reach โปรดตรวจนิยาม metric หรือข้อมูลซ้ำ');
+  if (candidate.purchases > 0 && !candidate.revenue) warnings.push('มี Purchases แต่ Revenue เป็นศูนย์หรือไม่มีข้อมูล');
+  if (candidate.revenue > 0 && !candidate.purchases) warnings.push('มี Revenue แต่ Purchases เป็นศูนย์หรือไม่มีข้อมูล');
+  const before = Number(previous[key]); const after = Number(candidate[key]);
+  if (before > 0 && (after >= before * 1.5 || after <= before * .5)) warnings.push(`ค่าเปลี่ยนจาก ${exactNumber(before)} เป็น ${exactNumber(after)} ตั้งแต่ 50%`);
+  return { errors, warnings, derived: metricPreview(candidate) };
+};
+
+const CardMetricEditor = ({ data, metric, onClose, onRefresh, onSessionExpiry }) => {
+  const rows = data?.campaign_results || [];
+  const ownerId = data?.scope?.project_id || data?.report?.id;
+  const periodId = data?.scope?.period_id || data?.report?.id;
+  const [rowId, setRowId] = useState(rows[0]?.campaign_id || '');
+  const row = rows.find(item => item.campaign_id === rowId) || rows[0];
+  const [value, setValue] = useState(row?.[metric.key] ?? '');
+  const [reason, setReason] = useState('แก้ไขหลังตรวจสอบแหล่งข้อมูล');
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  useEffect(() => { setValue(row?.[metric.key] ?? ''); setAcknowledged(false); setError(null); }, [rowId, metric.key]);
+  if (!row || !ownerId) return null;
+  const numeric = value === '' ? null : Number(value);
+  const changed = (row[metric.key] ?? null) !== numeric;
+  const candidate = { ...row, [metric.key]: numeric };
+  const validation = Number.isFinite(numeric) || numeric === null ? validateMetricCandidate(candidate, row, metric.key) : { errors: ['กรุณากรอกตัวเลขที่ถูกต้อง'], warnings: [], derived: {} };
+  const save = async () => {
+    if (!changed) return setError('ค่ายังไม่เปลี่ยน');
+    if (validation.errors.length) return setError(validation.errors[0]);
+    if (validation.warnings.length && !acknowledged) return setError('ต้องตรวจสอบและยืนยันคำเตือนก่อนบันทึก');
+    if (reason.trim().length < 3) return setError('กรุณาระบุเหตุผลอย่างน้อย 3 ตัวอักษร');
+    setSaving(true); setError(null);
+    try {
+      await updateCampaignMetrics(ownerId, { period_id: periodId, campaign_id: row.campaign_id, values: { [metric.key]: numeric }, reason: reason.trim(), acknowledge_warnings: acknowledged });
+      await onRefresh(); onClose();
+    } catch (err) { if (!onSessionExpiry?.(err)) setError(err.message); }
+    finally { setSaving(false); }
+  };
+  return <section className="card-metric-editor" aria-labelledby="card-metric-editor-title"><div className="card-editor-heading"><div><h2 id="card-metric-editor-title">ตรวจแก้ {metric.label}</h2><p>ระบบจะคำนวณ Derived metrics ใหม่ก่อนบันทึก และเก็บเหตุผลไว้ใน Audit trail</p></div><button type="button" onClick={onClose} aria-label="ปิด"><X size={15} /></button></div>{rows.length > 1 && <label>Campaign<select value={row.campaign_id} onChange={event => setRowId(event.target.value)}>{rows.map(item => <option value={item.campaign_id} key={item.campaign_id}>{item.campaign_name}</option>)}</select></label>}<div className="card-editor-grid"><label>ค่าปัจจุบัน<strong>{campaignMetricValue(metric.key, row[metric.key])}</strong></label><label>ค่าใหม่<input autoFocus type="number" min="0" step="any" value={value} onChange={event => { setValue(event.target.value); setAcknowledged(false); }} /></label><label className="card-editor-reason">เหตุผล<input maxLength="500" value={reason} onChange={event => setReason(event.target.value)} /></label></div>{validation.errors.length > 0 && <div className="metric-validation error"><AlertCircle size={15} /><div><strong>บันทึกไม่ได้</strong>{validation.errors.map(item => <span key={item}>{item}</span>)}</div></div>}{validation.warnings.length > 0 && <div className="metric-validation warning"><AlertTriangle size={15} /><div><strong>ตัวเลขผิดปกติ — กรุณาตรวจสอบ</strong>{validation.warnings.map(item => <span key={item}>{item}</span>)}<label><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> ตรวจสอบกับแหล่งข้อมูลแล้วและยืนยันค่าตามนี้</label></div></div>}<div className="derived-preview"><span>ผลคำนวณใหม่</span>{Object.entries(validation.derived).map(([key, calculated]) => <div key={key}><small>{key.toUpperCase()}</small><strong>{campaignMetricValue(key, calculated)}</strong></div>)}</div>{error && <div className="inline-error" role="alert"><AlertCircle size={14} />{error}</div>}<div className="card-editor-actions"><button type="button" onClick={onClose}>ยกเลิก</button><button className="primary-action" type="button" disabled={saving || !changed || validation.errors.length > 0 || (validation.warnings.length > 0 && !acknowledged)} onClick={save}>{saving ? <LoaderCircle className="button-spinner" size={14} /> : <Save size={14} />} ยืนยันและคำนวณใหม่</button></div></section>;
+};
+
 const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpiry }) => {
   const rows = data?.campaign_results || [];
   const definitions = data?.custom_metrics || [];
@@ -242,6 +294,8 @@ const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpi
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [formulaOpen, setFormulaOpen] = useState(false);
+  const [tableWarnings, setTableWarnings] = useState([]);
+  const [tableWarningsAcknowledged, setTableWarningsAcknowledged] = useState(false);
   const [formula, setFormula] = useState({ key: '', label: '', formula: 'revenue / spend', unit: 'ratio', decimals: 2 });
 
   useEffect(() => {
@@ -249,18 +303,23 @@ const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpi
     setDrafts({});
     setError(null);
     setFormulaOpen(false);
+    setTableWarnings([]);
+    setTableWarningsAcknowledged(false);
   }, [data?.scope?.project_id, data?.scope?.period_id, data?.scope?.campaign_ids?.join('|')]);
 
   const beginEdit = () => {
     setDrafts(Object.fromEntries(rows.map(row => [row.campaign_id, Object.fromEntries(CAMPAIGN_BASE_COLUMNS.map(([key]) => [key, row[key] ?? '']))])));
     setEditing(true);
     setError(null);
+    setTableWarnings([]);
+    setTableWarningsAcknowledged(false);
   };
   const saveChanges = async () => {
     if (!reason.trim() || reason.trim().length < 3) return setError('กรุณาระบุเหตุผลการแก้ไขอย่างน้อย 3 ตัวอักษร');
     setSaving(true);
     setError(null);
     try {
+      const changes = [];
       for (const row of rows) {
         const values = {};
         CAMPAIGN_BASE_COLUMNS.forEach(([key]) => {
@@ -268,8 +327,17 @@ const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpi
           const next = raw === '' ? null : Number(raw);
           if ((row[key] ?? null) !== next) values[key] = next;
         });
-        if (Object.keys(values).length) await updateCampaignMetrics(metricOwnerId, { period_id: metricPeriodId, campaign_id: row.campaign_id, values, reason: reason.trim() });
+        if (Object.keys(values).length) {
+          const validations = Object.keys(values).map(key => validateMetricCandidate({ ...row, ...values }, row, key));
+          const validationErrors = [...new Set(validations.flatMap(item => item.errors))];
+          const validationWarnings = [...new Set(validations.flatMap(item => item.warnings))];
+          if (validationErrors.length) { setError(`${row.campaign_name}: ${validationErrors.join(' · ')}`); setSaving(false); return; }
+          changes.push({ row, values, warnings: validationWarnings });
+        }
       }
+      const warnings = changes.flatMap(item => item.warnings.map(warning => `${item.row.campaign_name}: ${warning}`));
+      if (warnings.length && !tableWarningsAcknowledged) { setTableWarnings(warnings); setError('ตรวจพบตัวเลขผิดปกติ กรุณาตรวจสอบและยืนยันก่อนบันทึก'); setSaving(false); return; }
+      for (const item of changes) await updateCampaignMetrics(metricOwnerId, { period_id: metricPeriodId, campaign_id: item.row.campaign_id, values: item.values, reason: reason.trim(), acknowledge_warnings: tableWarningsAcknowledged });
       setEditing(false);
       await onRefresh();
     } catch (err) {
@@ -304,6 +372,7 @@ const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpi
       </div>}
     </div>
     {editing && <label className="override-reason">เหตุผลการแก้ไข<input value={reason} maxLength="500" onChange={event => setReason(event.target.value)} /></label>}
+    {tableWarnings.length > 0 && <div className="metric-validation warning table-validation"><AlertTriangle size={15} /><div><strong>ตรวจพบค่าที่อาจทำให้รายงานคลาดเคลื่อน</strong>{tableWarnings.map(item => <span key={item}>{item}</span>)}<label><input type="checkbox" checked={tableWarningsAcknowledged} onChange={event => setTableWarningsAcknowledged(event.target.checked)} /> ตรวจสอบกับแหล่งข้อมูลแล้วและยืนยันค่าตามนี้</label></div></div>}
     {formulaOpen && !readOnly && <form className="formula-builder" onSubmit={addFormula}>
       <label>ชื่อ Metric<input required maxLength="80" value={formula.label} onChange={event => setFormula({ ...formula, label: event.target.value })} placeholder="เช่น Cost per purchase" /></label>
       <label>Metric key<input required pattern="[a-z][a-z0-9_]{1,39}" value={formula.key} onChange={event => setFormula({ ...formula, key: event.target.value.toLowerCase() })} placeholder="cost_per_purchase" /></label>
@@ -329,7 +398,7 @@ const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpi
 };
 
 // ============ TIER 1: OVERVIEW ============
-const TierOverview = ({ data, mode, onSelectPost }) => {
+const TierOverview = ({ data, mode, onSelectPost, onEditMetric }) => {
   const baseOverview = data.campaign_overview || data.overview;
   const baseline = data.baseline;
   const posts = applyMode(data.posts, mode);
@@ -348,8 +417,8 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
       title: 'Awareness',
       description: 'คนเห็นมากแค่ไหน และเห็นซ้ำเพียงใด',
       metrics: [
-        { label: 'Reach', value: fmt(ov.reach_total), exact: exactNumber(ov.reach_total), sub: 'จำนวนคนที่เข้าถึง', source: 'Meta API' },
-        { label: 'Impressions', value: fmt(ov.impressions_total), exact: exactNumber(ov.impressions_total), sub: 'จำนวนครั้งที่แสดงผล', source: 'Meta API' },
+        { label: 'Reach', editableKey: 'reach', value: fmt(ov.reach_total), exact: exactNumber(ov.reach_total), sub: 'จำนวนคนที่เข้าถึง', source: 'Meta API' },
+        { label: 'Impressions', editableKey: 'impressions', value: fmt(ov.impressions_total), exact: exactNumber(ov.impressions_total), sub: 'จำนวนครั้งที่แสดงผล', source: 'Meta API' },
         { label: 'Frequency', value: ov.frequency != null ? `${ov.frequency}×` : 'N/A', exact: exactNumber(ov.frequency), sub: 'Impressions ÷ Reach', source: 'คำนวณ' },
       ],
     },
@@ -357,9 +426,9 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
       title: 'Engagement',
       description: 'คนตอบสนองและเดินทางต่อจากคอนเทนต์หรือไม่',
       metrics: [
-        { label: 'Engagement', value: fmt(ov.engagement_total), exact: exactNumber(ov.engagement_total), sub: 'รวม engaged users', source: 'Meta API' },
+        { label: 'Engagement', editableKey: 'engagement', value: fmt(ov.engagement_total), exact: exactNumber(ov.engagement_total), sub: 'รวม engaged users', source: 'Meta API' },
         { label: 'Engagement rate', value: ov.avg_er != null ? `${ov.avg_er}%` : 'N/A', exact: exactNumber(ov.avg_er), sub: baseline.ER != null ? `Baseline ${baseline.ER}%` : 'Engagement ÷ Reach', source: 'คำนวณ' },
-        { label: 'Link clicks', value: fmt(ov.link_clicks_total), exact: exactNumber(ov.link_clicks_total), sub: 'คลิกที่พาออกจากโพสต์', source: 'Meta API' },
+        { label: 'Link clicks', editableKey: 'link_clicks', value: fmt(ov.link_clicks_total), exact: exactNumber(ov.link_clicks_total), sub: 'คลิกที่พาออกจากโพสต์', source: 'Meta API' },
         { label: 'Link CTR', value: ov.link_ctr != null ? `${ov.link_ctr}%` : 'N/A', exact: exactNumber(ov.link_ctr), sub: 'Link clicks ÷ Impressions', source: 'คำนวณ' },
       ],
     },
@@ -367,9 +436,9 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
       title: 'Conversion',
       description: 'ผลลัพธ์ทางธุรกิจและเงินที่กลับมาจากงบโฆษณา',
       metrics: [
-        { label: 'Purchases', value: fmt(ov.purchases), exact: exactNumber(ov.purchases), sub: ov.purchases == null ? 'รอ Pixel / CAPI หรือไฟล์ยอดขาย' : 'จำนวนคำสั่งซื้อที่ระบุแหล่งได้', source: 'API / File' },
-        { label: 'Revenue · ยอดขาย', value: fmtMoney(ov.revenue), exact: exactMoney(ov.revenue), sub: ov.revenue == null ? 'รอ conversion value หรือไฟล์ยอดขาย' : 'มูลค่า conversion รวม', source: revenueSource },
-        { label: 'Spend', value: fmtMoney(ov.spend_total), exact: exactMoney(ov.spend_total), sub: <>CPM <ExactValue exact={exactMoney(ov.cpm)}>{fmtMoney(ov.cpm)}</ExactValue> · CPE {ov.cpe != null ? `฿${ov.cpe}` : 'N/A'}</>, source: 'Meta API' },
+        { label: 'Purchases', editableKey: 'purchases', value: fmt(ov.purchases), exact: exactNumber(ov.purchases), sub: ov.purchases == null ? 'รอ Pixel / CAPI หรือไฟล์ยอดขาย' : 'จำนวนคำสั่งซื้อที่ระบุแหล่งได้', source: 'API / File' },
+        { label: 'Revenue · ยอดขาย', editableKey: 'revenue', value: fmtMoney(ov.revenue), exact: exactMoney(ov.revenue), sub: ov.revenue == null ? 'รอ conversion value หรือไฟล์ยอดขาย' : 'มูลค่า conversion รวม', source: revenueSource },
+        { label: 'Spend', editableKey: 'spend', value: fmtMoney(ov.spend_total), exact: exactMoney(ov.spend_total), sub: <>CPM <ExactValue exact={exactMoney(ov.cpm)}>{fmtMoney(ov.cpm)}</ExactValue> · CPE {ov.cpe != null ? `฿${ov.cpe}` : 'N/A'}</>, source: 'Meta API' },
         { label: 'ROAS', value: ov.roas != null ? `${ov.roas}×` : 'N/A', exact: exactNumber(ov.roas), sub: ov.conversion_spend != null ? <>ยอดขาย ÷ งบ Conversion <ExactValue exact={exactMoney(ov.conversion_spend)}>{fmtMoney(ov.conversion_spend)}</ExactValue></> : 'รอข้อมูล Conversion', source: 'คำนวณ' },
         { label: 'ROI', value: ov.roi != null ? `${ov.roi}%` : 'N/A', exact: exactNumber(ov.roi), sub: '(ยอดขาย − งบ Conversion) ÷ งบ', source: 'คำนวณ' },
       ],
@@ -382,7 +451,7 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
   return (
     <div>
       <div className="funnel-overview">
-        {funnelGroups.map(group => <FunnelGroup key={group.title} {...group} />)}
+        {funnelGroups.map(group => <FunnelGroup key={group.title} {...group} onEditMetric={onEditMetric} />)}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -1608,6 +1677,7 @@ export default function Dashboard() {
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [activeSavedReport, setActiveSavedReport] = useState(null);
   const [previewSnapshot, setPreviewSnapshot] = useState(null);
+  const [cardMetricEdit, setCardMetricEdit] = useState(null);
   const [portfolio, setPortfolio] = useState({ loading: true, error: null, data: null });
   const [selectedProjectId, setSelectedProjectId] = useState(initialReport?.projectId || null);
   const [reportSourceMode] = useState('demo');
@@ -1995,7 +2065,7 @@ export default function Dashboard() {
                 )}
                 {data && !loading && (
                   <>
-                    {tier === 'overview' && <><TierOverview data={data} mode={mode} onSelectPost={handleSelect} /><CampaignResultsTable data={data} onRefresh={() => setRefreshKey(key => key + 1)} onSessionExpiry={handleSessionExpiry} /></>}
+                    {tier === 'overview' && <>{cardMetricEdit && <CardMetricEditor data={data} metric={cardMetricEdit} onClose={() => setCardMetricEdit(null)} onRefresh={() => setRefreshKey(key => key + 1)} onSessionExpiry={handleSessionExpiry} />}<TierOverview data={data} mode={mode} onSelectPost={handleSelect} onEditMetric={mode === 'combined' ? setCardMetricEdit : null} /><CampaignResultsTable data={data} onRefresh={() => setRefreshKey(key => key + 1)} onSessionExpiry={handleSessionExpiry} /></>}
                     {tier === 'content' && <ClientContentIndex posts={applyMode(data.posts, mode)} onSelect={handleSelect} />}
                     {tier === 'split' && <TierAdsOrganic data={data} />}
                     {tier === 'post' && selectedPost && <TierPostDetail post={selectedPost} baseline={data.baseline} />}
