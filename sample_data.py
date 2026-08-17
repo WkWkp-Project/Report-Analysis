@@ -52,6 +52,9 @@ def sample_posts(
                                minutes=rng.choice([0, 30]))
         spend = round(rng.uniform(8000, 50000)) if is_paid else None
         objective = rng.choice(["AWARENESS", "ENGAGEMENT", "TRAFFIC", "CONVERSIONS"]) if is_paid else None
+        roas = round(rng.uniform(2.0, 6.5), 1) if (is_paid and objective == "CONVERSIONS") else None
+        purchases = rng.randint(18, 240) if roas is not None else None
+        revenue = round(spend * roas, 2) if (spend is not None and roas is not None) else None
 
         like = int(eng * rng.uniform(0.3, 0.5))
         post = {
@@ -108,7 +111,9 @@ def sample_posts(
             "ad_frequency": round(rng.uniform(1.2, 3.0), 2) if is_paid else None,
             "ad_cpm": round(rng.uniform(90, 260)) if is_paid else None,
             "ad_cpc": round(rng.uniform(2, 9), 2) if is_paid else None,
-            "ad_roas": round(rng.uniform(2.0, 6.5), 1) if (is_paid and objective == "CONVERSIONS") else None,
+            "ad_roas": roas,
+            "ad_purchases": purchases,
+            "ad_revenue": revenue,
 
             "data_pulled_at": datetime.now(UTC).isoformat(),
             "missing_fields": [],

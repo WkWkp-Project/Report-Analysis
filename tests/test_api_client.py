@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import Mock, patch
 
-from api_client import FBClient
+from api_client import FBClient, _extract_purchase_metric
 from facebook_connection import FacebookConnectionError
 
 
@@ -29,6 +29,21 @@ class LegacyApiClientSecurityTests(unittest.TestCase):
     def test_external_pagination_host_is_rejected(self):
         with self.assertRaises(FacebookConnectionError):
             self.client()._get("https://attacker.example/collect")
+
+
+class PurchaseMetricTests(unittest.TestCase):
+    def test_prefers_omni_purchase_without_double_counting_overlapping_actions(self):
+        ad_data = {
+            "actions": [
+                {"action_type": "purchase", "value": "9"},
+                {"action_type": "omni_purchase", "value": "12"},
+            ]
+        }
+
+        self.assertEqual(_extract_purchase_metric(ad_data, "actions"), 12.0)
+
+    def test_missing_purchase_value_remains_unknown(self):
+        self.assertIsNone(_extract_purchase_metric({"action_values": []}, "action_values"))
 
 
 if __name__ == "__main__":

@@ -136,17 +136,73 @@ const RecBlock = ({ icon, title, color, bg, textColor, items }) => (
   </div>
 );
 
+const FunnelMetric = ({ label, value, exact, sub, source }) => (
+  <div className="funnel-metric">
+    <div className="funnel-metric-head">
+      <span>{label}</span>
+      <small>{source}</small>
+    </div>
+    <div className="funnel-metric-value"><ExactValue exact={exact}>{value}</ExactValue></div>
+    <div className="funnel-metric-sub">{sub || '\u00a0'}</div>
+  </div>
+);
+
+const FunnelGroup = ({ title, description, metrics }) => (
+  <section className="funnel-group" aria-label={title}>
+    <header>
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </header>
+    <div className="funnel-metric-grid">
+      {metrics.map(metric => <FunnelMetric key={metric.label} {...metric} />)}
+    </div>
+  </section>
+);
+
 // ============ TIER 1: OVERVIEW ============
 const TierOverview = ({ data, mode, onSelectPost }) => {
-  const ov = data.overview;
+  const baseOverview = data.overview;
   const baseline = data.baseline;
   const posts = applyMode(data.posts, mode);
-
-  const kpis = [
-    { label: 'Reach', v: fmt(ov.reach_total), exact: exactNumber(ov.reach_total), sub: <>Organic <ExactValue exact={exactNumber(ov.reach_organic)}>{fmt(ov.reach_organic)}</ExactValue> · Paid <ExactValue exact={exactNumber(ov.reach_paid)}>{fmt(ov.reach_paid)}</ExactValue></> },
-    { label: 'ER', v: ov.avg_er != null ? `${ov.avg_er}%` : 'N/A', sub: baseline.ER != null ? `baseline ${baseline.ER}%` : '' },
-    { label: 'Spend', v: fmtMoney(ov.spend_total), exact: exactMoney(ov.spend_total), sub: <>CPM <ExactValue exact={exactMoney(ov.cpm)}>{fmtMoney(ov.cpm)}</ExactValue> · CPE {ov.cpe != null ? '฿' + ov.cpe : 'N/A'}</> },
-    { label: 'ROAS', v: ov.roas != null ? `${ov.roas}×` : 'N/A', sub: 'conversion ads only' },
+  const ov = mode === 'all' ? baseOverview : summarizePosts(posts);
+  const revenueSource = ov.revenue_source === 'meta_action_values'
+    ? 'Meta API'
+    : ov.revenue_source === 'mixed'
+      ? 'API + คำนวณ'
+      : ov.revenue_source === 'calculated_from_roas'
+        ? 'คำนวณ'
+        : 'API / File';
+  const funnelGroups = [
+    {
+      title: 'Awareness',
+      description: 'คนเห็นมากแค่ไหน และเห็นซ้ำเพียงใด',
+      metrics: [
+        { label: 'Reach', value: fmt(ov.reach_total), exact: exactNumber(ov.reach_total), sub: 'จำนวนคนที่เข้าถึง', source: 'Meta API' },
+        { label: 'Impressions', value: fmt(ov.impressions_total), exact: exactNumber(ov.impressions_total), sub: 'จำนวนครั้งที่แสดงผล', source: 'Meta API' },
+        { label: 'Frequency', value: ov.frequency != null ? `${ov.frequency}×` : 'N/A', exact: exactNumber(ov.frequency), sub: 'Impressions ÷ Reach', source: 'คำนวณ' },
+      ],
+    },
+    {
+      title: 'Engagement',
+      description: 'คนตอบสนองและเดินทางต่อจากคอนเทนต์หรือไม่',
+      metrics: [
+        { label: 'Engagement', value: fmt(ov.engagement_total), exact: exactNumber(ov.engagement_total), sub: 'รวม engaged users', source: 'Meta API' },
+        { label: 'Engagement rate', value: ov.avg_er != null ? `${ov.avg_er}%` : 'N/A', exact: exactNumber(ov.avg_er), sub: baseline.ER != null ? `Baseline ${baseline.ER}%` : 'Engagement ÷ Reach', source: 'คำนวณ' },
+        { label: 'Link clicks', value: fmt(ov.link_clicks_total), exact: exactNumber(ov.link_clicks_total), sub: 'คลิกที่พาออกจากโพสต์', source: 'Meta API' },
+        { label: 'Link CTR', value: ov.link_ctr != null ? `${ov.link_ctr}%` : 'N/A', exact: exactNumber(ov.link_ctr), sub: 'Link clicks ÷ Impressions', source: 'คำนวณ' },
+      ],
+    },
+    {
+      title: 'Conversion',
+      description: 'ผลลัพธ์ทางธุรกิจและเงินที่กลับมาจากงบโฆษณา',
+      metrics: [
+        { label: 'Purchases', value: fmt(ov.purchases), exact: exactNumber(ov.purchases), sub: ov.purchases == null ? 'รอ Pixel / CAPI หรือไฟล์ยอดขาย' : 'จำนวนคำสั่งซื้อที่ระบุแหล่งได้', source: 'API / File' },
+        { label: 'Revenue · ยอดขาย', value: fmtMoney(ov.revenue), exact: exactMoney(ov.revenue), sub: ov.revenue == null ? 'รอ conversion value หรือไฟล์ยอดขาย' : 'มูลค่า conversion รวม', source: revenueSource },
+        { label: 'Spend', value: fmtMoney(ov.spend_total), exact: exactMoney(ov.spend_total), sub: <>CPM <ExactValue exact={exactMoney(ov.cpm)}>{fmtMoney(ov.cpm)}</ExactValue> · CPE {ov.cpe != null ? `฿${ov.cpe}` : 'N/A'}</>, source: 'Meta API' },
+        { label: 'ROAS', value: ov.roas != null ? `${ov.roas}×` : 'N/A', exact: exactNumber(ov.roas), sub: ov.conversion_spend != null ? <>ยอดขาย ÷ งบ Conversion <ExactValue exact={exactMoney(ov.conversion_spend)}>{fmtMoney(ov.conversion_spend)}</ExactValue></> : 'รอข้อมูล Conversion', source: 'คำนวณ' },
+        { label: 'ROI', value: ov.roi != null ? `${ov.roi}%` : 'N/A', exact: exactNumber(ov.roi), sub: '(ยอดขาย − งบ Conversion) ÷ งบ', source: 'คำนวณ' },
+      ],
+    },
   ];
 
   const maxER = Math.max(...data.format_perf.map(f => f.ER), 1);
@@ -154,14 +210,8 @@ const TierOverview = ({ data, mode, onSelectPost }) => {
 
   return (
     <div>
-      <div className="overview-kpi-grid" style={{ marginBottom: 16 }}>
-        {kpis.map(k => (
-          <div key={k.label} style={{ flex: 1, background: 'white', border: '0.5px solid #E7E5E4', borderRadius: 8, padding: '14px 16px' }}>
-            <div style={{ fontSize: 11, color: '#78716C', textTransform: 'uppercase', letterSpacing: 0.5 }}>{k.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 500, marginTop: 4, ...monoStyle }}><ExactValue exact={k.exact}>{k.v}</ExactValue></div>
-            <div style={{ fontSize: 10, color: '#78716C', marginTop: 4 }}>{k.sub}</div>
-          </div>
-        ))}
+      <div className="funnel-overview">
+        {funnelGroups.map(group => <FunnelGroup key={group.title} {...group} />)}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -545,6 +595,43 @@ function applyMode(posts, mode) {
   if (mode === 'organic') return posts.filter(p => p.type === 'organic');
   if (mode === 'paid') return posts.filter(p => p.type !== 'organic');
   return posts;
+}
+
+function summarizePosts(posts) {
+  const impressions = sum(posts, 'impressions');
+  const reach = sum(posts, 'reach');
+  const engagement = sum(posts, 'engagement');
+  const linkClicks = sum(posts, 'link_clicks');
+  const spend = sum(posts, 'spend');
+  const purchaseValues = posts.filter(p => p.purchases != null).map(p => Number(p.purchases));
+  const directRevenue = posts.filter(p => p.revenue != null).map(p => Number(p.revenue));
+  const derivedRevenue = posts
+    .filter(p => p.revenue == null && p.spend != null && p.roas != null)
+    .map(p => Number(p.spend) * Number(p.roas));
+  const revenueValues = [...directRevenue, ...derivedRevenue];
+  const revenue = revenueValues.length ? revenueValues.reduce((total, value) => total + value, 0) : null;
+  const conversionSpend = posts
+    .filter(p => p.revenue != null || p.roas != null)
+    .reduce((total, post) => total + Number(post.spend || 0), 0);
+
+  return {
+    impressions_total: impressions,
+    reach_total: reach,
+    frequency: reach ? Number((impressions / reach).toFixed(2)) : null,
+    engagement_total: engagement,
+    avg_er: reach ? Number((engagement / reach * 100).toFixed(1)) : null,
+    link_clicks_total: linkClicks,
+    link_ctr: impressions ? Number((linkClicks / impressions * 100).toFixed(2)) : null,
+    purchases: purchaseValues.length ? purchaseValues.reduce((total, value) => total + value, 0) : null,
+    revenue,
+    conversion_spend: conversionSpend || null,
+    revenue_source: directRevenue.length && derivedRevenue.length ? 'mixed' : directRevenue.length ? 'meta_action_values' : derivedRevenue.length ? 'calculated_from_roas' : null,
+    spend_total: spend || null,
+    cpm: spend && reach ? Number((spend / reach * 1000).toFixed(0)) : null,
+    cpe: spend && engagement ? Number((spend / engagement).toFixed(2)) : null,
+    roas: revenue != null && conversionSpend ? Number((revenue / conversionSpend).toFixed(2)) : null,
+    roi: revenue != null && conversionSpend ? Number(((revenue - conversionSpend) / conversionSpend * 100).toFixed(1)) : null,
+  };
 }
 
 function buildInsights(data) {

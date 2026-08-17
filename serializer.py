@@ -100,6 +100,8 @@ def serialize_post(post: dict, score) -> dict:
         "cpm": post.get("ad_cpm"),
         "cpe": round(spend / eng, 2) if (spend and eng) else None,
         "roas": post.get("ad_roas"),
+        "purchases": post.get("ad_purchases"),
+        "revenue": post.get("ad_revenue"),
 
         "hide_post": post.get("hide_post"),
         "report_spam": post.get("report_spam"),
@@ -217,23 +219,57 @@ def _cost_table(paid_posts: list) -> list:
 
 
 def _overview(posts: list, baseline: dict) -> dict:
+    impressions = sum((p.get("impressions") or 0) for p in posts)
     reach = sum((p.get("reach") or 0) for p in posts)
     org = sum((p.get("reach_organic") or 0) for p in posts)
     paid = sum((p.get("reach_paid") or 0) for p in posts)
     eng = sum((p.get("engaged_users") or 0) for p in posts)
     spend = sum((p.get("ad_spend") or 0) for p in posts)
+    link_clicks = sum((p.get("link_clicks") or 0) for p in posts)
+    purchase_values = [p.get("ad_purchases") for p in posts if p.get("ad_purchases") is not None]
+    direct_revenue_values = [p.get("ad_revenue") for p in posts if p.get("ad_revenue") is not None]
+    derived_revenue_values = [
+        p["ad_spend"] * p["ad_roas"]
+        for p in posts
+        if p.get("ad_revenue") is None and p.get("ad_spend") is not None and p.get("ad_roas") is not None
+    ]
+    revenue_values = direct_revenue_values + derived_revenue_values
+    revenue = sum(revenue_values) if revenue_values else None
+    conversion_spend = sum(
+        (p.get("ad_spend") or 0)
+        for p in posts
+        if p.get("ad_revenue") is not None or p.get("ad_roas") is not None
+    )
     avg_er = round(eng / reach * 100, 1) if reach else None
     roas_vals = [p.get("ad_roas") for p in posts if p.get("ad_roas") is not None]
+    roas = (revenue / conversion_spend) if (revenue is not None and conversion_spend) else None
+    if roas is None and roas_vals:
+        roas = sum(roas_vals) / len(roas_vals)
     return {
+        "impressions_total": impressions,
         "reach_total": reach,
         "reach_organic": org,
         "reach_paid": paid,
         "avg_er": avg_er,
+        "frequency": round(impressions / reach, 2) if reach else None,
+        "engagement_total": eng,
+        "link_clicks_total": link_clicks,
+        "link_ctr": round(link_clicks / impressions * 100, 2) if impressions else None,
         "baseline_er": baseline.get("ER"),
         "spend_total": round(spend) if spend else None,
         "cpm": round(spend / reach * 1000) if (spend and reach) else None,
         "cpe": round(spend / eng, 2) if (spend and eng) else None,
-        "roas": round(sum(roas_vals) / len(roas_vals), 1) if roas_vals else None,
+        "purchases": round(sum(purchase_values)) if purchase_values else None,
+        "revenue": round(revenue, 2) if revenue is not None else None,
+        "conversion_spend": round(conversion_spend, 2) if conversion_spend else None,
+        "revenue_source": (
+            "mixed" if direct_revenue_values and derived_revenue_values
+            else "meta_action_values" if direct_revenue_values
+            else "calculated_from_roas" if derived_revenue_values
+            else None
+        ),
+        "roas": round(roas, 2) if roas is not None else None,
+        "roi": round((revenue - conversion_spend) / conversion_spend * 100, 1) if (revenue is not None and conversion_spend) else None,
     }
 
 

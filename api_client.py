@@ -227,7 +227,7 @@ class FBClient:
                     "fields": ",".join([
                         "spend", "impressions", "reach", "frequency",
                         "cpm", "cpp", "cpc",
-                        "actions", "cost_per_action_type",
+                        "actions", "action_values", "cost_per_action_type",
                         "purchase_roas",
                         "unique_clicks", "unique_ctr",
                         "objective", "optimization_goal"
@@ -371,6 +371,8 @@ class FBClient:
             "ad_cpm": float(ad_data["cpm"]) if ad_data and "cpm" in ad_data else None,
             "ad_cpc": float(ad_data["cpc"]) if ad_data and "cpc" in ad_data else None,
             "ad_roas": _extract_roas(ad_data) if ad_data else None,
+            "ad_purchases": _extract_purchase_metric(ad_data, "actions") if ad_data else None,
+            "ad_revenue": _extract_purchase_metric(ad_data, "action_values") if ad_data else None,
 
             # Metadata
             "data_pulled_at": datetime.utcnow().isoformat(),
@@ -444,4 +446,22 @@ def _extract_roas(ad_data: dict) -> Optional[float]:
     for item in roas_list:
         if item.get("action_type") == "omni_purchase":
             return float(item.get("value", 0))
+    return None
+
+
+def _extract_purchase_metric(ad_data: dict, field: str) -> Optional[float]:
+    """Return one non-overlapping purchase value using Meta's preferred action order."""
+    rows = ad_data.get(field) or []
+    action_priority = (
+        "omni_purchase",
+        "purchase",
+        "offsite_conversion.fb_pixel_purchase",
+    )
+    for action_type in action_priority:
+        for item in rows:
+            if item.get("action_type") == action_type:
+                try:
+                    return float(item["value"])
+                except (KeyError, TypeError, ValueError):
+                    return None
     return None
