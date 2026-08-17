@@ -1507,8 +1507,15 @@ const LoginGate = ({ loading, error, onSubmit }) => {
   );
 };
 
+const ClientContentIndex = ({ posts, onSelect }) => <section className="client-content-index" aria-labelledby="client-content-title">
+  <div className="client-section-heading"><div><h2 id="client-content-title">Content results</h2><p>กดรายการเพื่อดู metric, scoring reason, creative pattern และคำแนะนำของคอนเทนต์ชิ้นนั้น</p></div><span>{posts.length} contents</span></div>
+  <div className="client-content-table-wrap"><table className="client-content-table"><thead><tr><th>Content</th><th>Type</th><th>Format</th><th>Reach</th><th>Engagement</th><th>Score</th><th></th></tr></thead><tbody>{posts.map(post => <tr key={post.id}><th scope="row"><strong>{post.title}</strong><small>{post.date} · {post.day}</small></th><td>{post.type}</td><td>{post.format}</td><td><ExactValue exact={exactNumber(post.reach)}>{fmt(post.reach)}</ExactValue></td><td><ExactValue exact={exactNumber(post.engagement)}>{fmt(post.engagement)}</ExactValue></td><td><span className="content-score" style={{ color: gradeColor(post.grade) }}>{post.score ?? '—'} · {post.grade || 'N/A'}</span></td><td><button type="button" onClick={() => onSelect(post)}>ดูรายละเอียด <ChevronRight size={14} /></button></td></tr>)}</tbody></table></div>
+</section>;
+
 const PublicReportView = ({ token }) => {
   const [state, setState] = useState({ loading: true, error: null, snapshot: null });
+  const [section, setSection] = useState('overview');
+  const [selectedPost, setSelectedPost] = useState(null);
   useEffect(() => {
     let alive = true;
     fetchPublicReport(token)
@@ -1519,15 +1526,23 @@ const PublicReportView = ({ token }) => {
   if (state.loading) return <main className="client-report-shell" style={fontStyle}><div className="client-report-state"><LoaderCircle className="button-spinner" size={18} /> กำลังเปิดรายงาน...</div></main>;
   if (state.error) return <main className="client-report-shell" style={fontStyle}><div className="client-report-state error"><AlertCircle size={18} /><strong>เปิดรายงานไม่ได้</strong><span>{state.error}</span></div></main>;
   const data = state.snapshot.report;
+  const openPost = post => { setSelectedPost(post); setSection('post'); window.scrollTo({ top: 0, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); };
   return <main className="client-report-shell" style={fontStyle}>
     <header className="client-report-header">
       <div><div className="client-report-brand">Report Analysis</div><h1>{data.scope?.project_name || data.page?.name}</h1><p>{data.scope?.period_label || `${data.range.since} — ${data.range.until}`} · Snapshot อ่านอย่างเดียว</p></div>
       <div className="client-report-actions"><span><Eye size={14} /> Client view</span><button type="button" onClick={() => window.print()}><Printer size={15} /> บันทึก PDF</button></div>
     </header>
-    <div className="client-report-meta"><ShieldCheck size={15} /><span>รายงานนี้เป็น snapshot ไม่สามารถแก้ตัวเลข สูตร หรือ Workspace ได้ · หมดอายุ {new Date(state.snapshot.expires_at).toLocaleDateString('th-TH')}</span></div>
-    <TierOverview data={data} mode="combined" onSelectPost={() => {}} />
-    <CampaignResultsTable data={data} readOnly />
-    <section className="client-report-section"><h2>Ads vs Organic</h2><TierAdsOrganic data={data} /></section>
+    <div className="client-report-meta"><ShieldCheck size={15} /><span>Interactive client view · กดดูรายละเอียดและตัวเลขเต็มได้ แต่แก้ข้อมูล สูตร หรือ Workspace ไม่ได้ · หมดอายุ {new Date(state.snapshot.expires_at).toLocaleDateString('th-TH')}</span></div>
+    <nav className="client-report-nav" aria-label="ส่วนต่าง ๆ ของรายงาน">
+      <button type="button" className={section === 'overview' ? 'active' : ''} onClick={() => setSection('overview')}>Overview</button>
+      <button type="button" className={section === 'content' ? 'active' : ''} onClick={() => setSection('content')}>Content <span>{data.posts.length}</span></button>
+      <button type="button" className={section === 'split' ? 'active' : ''} onClick={() => setSection('split')}>Ads vs Organic</button>
+      {selectedPost && <button type="button" className={section === 'post' ? 'active' : ''} onClick={() => setSection('post')}>Content detail</button>}
+    </nav>
+    {section === 'overview' && <><TierOverview data={data} mode="combined" onSelectPost={openPost} /><CampaignResultsTable data={data} readOnly /></>}
+    {section === 'content' && <ClientContentIndex posts={data.posts} onSelect={openPost} />}
+    {section === 'split' && <section className="client-report-section"><h2>Ads vs Organic</h2><TierAdsOrganic data={data} /></section>}
+    {section === 'post' && selectedPost && <section className="client-post-detail"><button className="secondary-action" type="button" onClick={() => setSection('content')}><ArrowLeft size={14} /> กลับไป Content ทั้งหมด</button><TierPostDetail post={selectedPost} baseline={data.baseline} /></section>}
   </main>;
 };
 
