@@ -673,11 +673,17 @@ label:focus-within {
 .portfolio-setup,
 .portfolio-ledger { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .portfolio-setup { padding: 19px; }
-.setup-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 3px; border-radius: 9px; background: #f0eee9; }
+.setup-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 3px; padding: 3px; border-radius: 9px; background: #f0eee9; }
 .setup-tabs button { min-height: 34px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
 .setup-tabs button.active { background: var(--surface); color: var(--teal); font-weight: 600; box-shadow: 0 3px 10px rgba(41,37,36,.07); }
 .setup-tabs button:disabled { opacity: .4; cursor: not-allowed; }
 .portfolio-form { display: flex; flex-direction: column; gap: 13px; margin-top: 17px; }
+.scope-context-lock { display:flex; align-items:center; gap:9px; padding:10px 11px; border-radius:9px; background:var(--teal-soft); color:var(--teal); }
+.scope-context-lock > svg { flex:0 0 auto; }
+.scope-context-lock small,
+.scope-context-lock strong { display:block; }
+.scope-context-lock small { margin-bottom:2px; color:#3d6861; font-size:9px; font-weight:500; }
+.scope-context-lock strong { overflow:hidden; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
 .portfolio-form > label { display: flex; flex-direction: column; gap: 6px; color: #494440; font-size: 12px; font-weight: 500; }
 .portfolio-form > label > span { color: var(--faint); font-size: 10px; font-weight: 400; }
 .portfolio-form input:not([type="checkbox"]),
