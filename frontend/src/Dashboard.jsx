@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle, LockKeyhole, LogOut, FolderKanban, Plus, MessageSquareText, ListChecks, Lightbulb, TextQuote, Pencil, Trash2, Save, Check, ArrowLeft, ArrowRight, CalendarRange, Cable, Download, Share2, Printer } from 'lucide-react';
-import { createBrand, createCampaign, createPeriod, createProject, createReportElement, deleteReportElement, disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, fetchPortfolio, fetchReportElements, login, logout, refreshFacebookConnection, startFacebookConnection, updateReportElement } from './api.js';
+import { ChevronRight, ChevronLeft, Calendar, TrendingUp, AlertTriangle, CheckCircle2, AlertCircle, Copy, Trophy, Sparkles, Bolt, BarChart3, Database, FileSpreadsheet, Layers3, Settings, Upload, RefreshCw, CircleCheck, X, Link2, ShieldCheck, ExternalLink, Unplug, LoaderCircle, LockKeyhole, LogOut, FolderKanban, Plus, MessageSquareText, ListChecks, Lightbulb, TextQuote, Pencil, Trash2, Save, Check, ArrowLeft, ArrowRight, CalendarRange, Cable, Download, Share2, Printer, Table2, Sigma, Eye } from 'lucide-react';
+import { createBrand, createCampaign, createCustomMetric, createPeriod, createProject, createReportElement, createReportShare, deleteReportElement, disconnectFacebook, fetchAnalysis, fetchAuthStatus, fetchFacebookStatus, fetchPortfolio, fetchPublicReport, fetchReportElements, login, logout, refreshFacebookConnection, startFacebookConnection, updateCampaignMetrics, updateReportElement } from './api.js';
 import './styles.css';
 
 // ============ FORMATTERS ============
@@ -38,6 +38,11 @@ const reportStateFromLocation = () => {
     periodId: params.get('period_id') || undefined,
     campaignIds: params.getAll('campaign_ids').filter(Boolean),
   };
+};
+const shareTokenFromLocation = () => {
+  if (typeof window === 'undefined') return null;
+  const token = new URLSearchParams(window.location.search).get('share');
+  return token && /^[A-Za-z0-9_-]{32,120}$/.test(token) ? token : null;
 };
 const reportUrl = period => {
   const url = new URL(window.location.href);
@@ -204,13 +209,127 @@ const FunnelGroup = ({ title, description, metrics }) => (
   </section>
 );
 
+const CAMPAIGN_BASE_COLUMNS = [
+  ['impressions', 'Impressions'], ['reach', 'Reach'], ['engagement', 'Engagement'],
+  ['link_clicks', 'Link clicks'], ['spend', 'Spend'], ['purchases', 'Purchases'], ['revenue', 'Revenue'],
+];
+const CAMPAIGN_DERIVED_COLUMNS = [
+  ['frequency', 'Frequency'], ['er', 'ER'], ['ctr', 'CTR'], ['cpm', 'CPM'],
+  ['cpe', 'CPE'], ['roas', 'ROAS'], ['roi', 'ROI'],
+];
+const campaignMetricValue = (key, value, definition) => {
+  if (value == null) return 'N/A';
+  const unit = definition?.unit || (['spend', 'revenue', 'cpm', 'cpe'].includes(key) ? 'currency' : ['er', 'ctr', 'roi'].includes(key) ? 'percent' : key === 'roas' || key === 'frequency' ? 'ratio' : 'number');
+  if (unit === 'currency') return fmtMoney(value);
+  if (unit === 'percent') return `${exactNumber(value)}%`;
+  if (unit === 'ratio') return `${exactNumber(value)}×`;
+  return fmt(value);
+};
+
+const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpiry }) => {
+  const rows = data?.campaign_results || [];
+  const definitions = data?.custom_metrics || [];
+  const [editing, setEditing] = useState(false);
+  const [drafts, setDrafts] = useState({});
+  const [reason, setReason] = useState('แก้ไขหลังตรวจสอบข้อมูลนำเข้า');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [formulaOpen, setFormulaOpen] = useState(false);
+  const [formula, setFormula] = useState({ key: '', label: '', formula: 'revenue / spend', unit: 'ratio', decimals: 2 });
+
+  useEffect(() => {
+    setEditing(false);
+    setDrafts({});
+    setError(null);
+    setFormulaOpen(false);
+  }, [data?.scope?.project_id, data?.scope?.period_id, data?.scope?.campaign_ids?.join('|')]);
+
+  const beginEdit = () => {
+    setDrafts(Object.fromEntries(rows.map(row => [row.campaign_id, Object.fromEntries(CAMPAIGN_BASE_COLUMNS.map(([key]) => [key, row[key] ?? '']))])));
+    setEditing(true);
+    setError(null);
+  };
+  const saveChanges = async () => {
+    if (!reason.trim() || reason.trim().length < 3) return setError('กรุณาระบุเหตุผลการแก้ไขอย่างน้อย 3 ตัวอักษร');
+    setSaving(true);
+    setError(null);
+    try {
+      for (const row of rows) {
+        const values = {};
+        CAMPAIGN_BASE_COLUMNS.forEach(([key]) => {
+          const raw = drafts[row.campaign_id]?.[key];
+          const next = raw === '' ? null : Number(raw);
+          if ((row[key] ?? null) !== next) values[key] = next;
+        });
+        if (Object.keys(values).length) await updateCampaignMetrics(data.scope.project_id, { period_id: data.scope.period_id, campaign_id: row.campaign_id, values, reason: reason.trim() });
+      }
+      setEditing(false);
+      await onRefresh();
+    } catch (err) {
+      if (!onSessionExpiry?.(err)) setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const addFormula = async event => {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await createCustomMetric(data.scope.project_id, { ...formula, decimals: Number(formula.decimals) });
+      setFormula({ key: '', label: '', formula: 'revenue / spend', unit: 'ratio', decimals: 2 });
+      setFormulaOpen(false);
+      await onRefresh();
+    } catch (err) {
+      if (!onSessionExpiry?.(err)) setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!data?.scope) return null;
+  return <section className="campaign-results" aria-labelledby="campaign-results-title">
+    <div className="campaign-results-heading">
+      <div><h2 id="campaign-results-title"><Table2 size={17} /> Campaign results</h2><p>{rows.length} Campaigns ที่ include อยู่ในรายงานนี้ · ค่าที่แก้เองมีเครื่องหมาย Manual และสูตรจะคำนวณใหม่อัตโนมัติ</p></div>
+      {!readOnly && <div className="campaign-admin-actions">
+        {!editing ? <button type="button" onClick={beginEdit}><Pencil size={14} /> แก้ไขตัวเลข</button> : <><button type="button" onClick={() => setEditing(false)} disabled={saving}>ยกเลิก</button><button className="save" type="button" onClick={saveChanges} disabled={saving}>{saving ? <LoaderCircle className="button-spinner" size={14} /> : <Save size={14} />} บันทึก</button></>}
+        <button type="button" onClick={() => setFormulaOpen(value => !value)}><Sigma size={14} /> สร้าง Metric</button>
+      </div>}
+    </div>
+    {editing && <label className="override-reason">เหตุผลการแก้ไข<input value={reason} maxLength="500" onChange={event => setReason(event.target.value)} /></label>}
+    {formulaOpen && !readOnly && <form className="formula-builder" onSubmit={addFormula}>
+      <label>ชื่อ Metric<input required maxLength="80" value={formula.label} onChange={event => setFormula({ ...formula, label: event.target.value })} placeholder="เช่น Cost per purchase" /></label>
+      <label>Metric key<input required pattern="[a-z][a-z0-9_]{1,39}" value={formula.key} onChange={event => setFormula({ ...formula, key: event.target.value.toLowerCase() })} placeholder="cost_per_purchase" /></label>
+      <label className="formula-expression">สูตร<input required maxLength="200" value={formula.formula} onChange={event => setFormula({ ...formula, formula: event.target.value })} /><small>ใช้ impressions, reach, engagement, link_clicks, spend, purchases, revenue และ + − × ÷ %</small></label>
+      <label>หน่วย<select value={formula.unit} onChange={event => setFormula({ ...formula, unit: event.target.value })}><option value="number">Number</option><option value="currency">Currency</option><option value="percent">Percent</option><option value="ratio">Ratio</option></select></label>
+      <button className="primary-action" type="submit" disabled={saving}><Plus size={14} /> เพิ่ม Metric</button>
+    </form>}
+    {error && <div className="inline-error" role="alert"><AlertCircle size={14} />{error}</div>}
+    <div className="campaign-table-scroll">
+      <table className="campaign-table">
+        <thead><tr><th>Campaign</th><th>Source</th>{CAMPAIGN_BASE_COLUMNS.map(([, label]) => <th key={label}>{label}</th>)}{CAMPAIGN_DERIVED_COLUMNS.map(([, label]) => <th className="calculated" key={label}>{label}<small>fx</small></th>)}{definitions.map(item => <th className="custom" key={item.key}>{item.label}<small>{item.formula}</small></th>)}</tr></thead>
+        <tbody>{rows.map(row => <tr key={row.campaign_id}>
+          <th scope="row"><strong>{row.campaign_name}</strong><small>{row.post_count} records</small></th>
+          <td><span className={`record-source ${row.record_source}`}>{row.record_source === 'demo' ? 'Demo allocation' : row.source}</span></td>
+          {CAMPAIGN_BASE_COLUMNS.map(([key]) => <td className={row.manual_fields?.includes(key) ? 'manual' : ''} key={key}>{editing ? <input type="number" min="0" step="any" value={drafts[row.campaign_id]?.[key] ?? ''} onChange={event => setDrafts(current => ({ ...current, [row.campaign_id]: { ...current[row.campaign_id], [key]: event.target.value } }))} aria-label={`${row.campaign_name} ${key}`} /> : <ExactValue exact={exactNumber(row[key])}>{campaignMetricValue(key, row[key])}</ExactValue>}{row.manual_fields?.includes(key) && <small title={row.override_reason}>Manual</small>}</td>)}
+          {CAMPAIGN_DERIVED_COLUMNS.map(([key]) => <td className="calculated" key={key}><ExactValue exact={exactNumber(row[key])}>{campaignMetricValue(key, row[key])}</ExactValue></td>)}
+          {definitions.map(item => <td className="custom" key={item.key}><ExactValue exact={exactNumber(row.custom_metrics?.[item.key])}>{campaignMetricValue(item.key, row.custom_metrics?.[item.key], item)}</ExactValue></td>)}
+        </tr>)}</tbody>
+      </table>
+    </div>
+    {!rows.length && <div className="compact-empty">ยังไม่มี Campaign result ใน scope นี้</div>}
+  </section>;
+};
+
 // ============ TIER 1: OVERVIEW ============
 const TierOverview = ({ data, mode, onSelectPost }) => {
-  const baseOverview = data.overview;
+  const baseOverview = data.campaign_overview || data.overview;
   const baseline = data.baseline;
   const posts = applyMode(data.posts, mode);
-  const ov = mode === 'all' ? baseOverview : summarizePosts(posts);
-  const revenueSource = ov.revenue_source === 'meta_action_values'
+  const ov = data.campaign_overview && mode !== 'organic' ? baseOverview : mode === 'combined' ? baseOverview : summarizePosts(posts);
+  const revenueSource = ov.revenue_source === 'manual_or_import'
+    ? 'Manual / File'
+    : ov.revenue_source === 'meta_action_values'
     ? 'Meta API'
     : ov.revenue_source === 'mixed'
       ? 'API + คำนวณ'
@@ -1312,8 +1431,33 @@ const LoginGate = ({ loading, error, onSubmit }) => {
   );
 };
 
+const PublicReportView = ({ token }) => {
+  const [state, setState] = useState({ loading: true, error: null, snapshot: null });
+  useEffect(() => {
+    let alive = true;
+    fetchPublicReport(token)
+      .then(snapshot => { if (alive) setState({ loading: false, error: null, snapshot }); })
+      .catch(error => { if (alive) setState({ loading: false, error: error.message, snapshot: null }); });
+    return () => { alive = false; };
+  }, [token]);
+  if (state.loading) return <main className="client-report-shell" style={fontStyle}><div className="client-report-state"><LoaderCircle className="button-spinner" size={18} /> กำลังเปิดรายงาน...</div></main>;
+  if (state.error) return <main className="client-report-shell" style={fontStyle}><div className="client-report-state error"><AlertCircle size={18} /><strong>เปิดรายงานไม่ได้</strong><span>{state.error}</span></div></main>;
+  const data = state.snapshot.report;
+  return <main className="client-report-shell" style={fontStyle}>
+    <header className="client-report-header">
+      <div><div className="client-report-brand">Report Analysis</div><h1>{data.scope?.project_name || data.page?.name}</h1><p>{data.scope?.period_label || `${data.range.since} — ${data.range.until}`} · Snapshot อ่านอย่างเดียว</p></div>
+      <div className="client-report-actions"><span><Eye size={14} /> Client view</span><button type="button" onClick={() => window.print()}><Printer size={15} /> บันทึก PDF</button></div>
+    </header>
+    <div className="client-report-meta"><ShieldCheck size={15} /><span>รายงานนี้เป็น snapshot ไม่สามารถแก้ตัวเลข สูตร หรือ Workspace ได้ · หมดอายุ {new Date(state.snapshot.expires_at).toLocaleDateString('th-TH')}</span></div>
+    <TierOverview data={data} mode="combined" onSelectPost={() => {}} />
+    <CampaignResultsTable data={data} readOnly />
+    <section className="client-report-section"><h2>Ads vs Organic</h2><TierAdsOrganic data={data} /></section>
+  </main>;
+};
+
 // ============ MAIN APP ============
 export default function Dashboard() {
+  const [shareToken] = useState(shareTokenFromLocation);
   const [initialReport] = useState(reportStateFromLocation);
   const [view, setView] = useState(initialReport ? 'report' : 'portfolio');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1325,12 +1469,14 @@ export default function Dashboard() {
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [portfolio, setPortfolio] = useState({ loading: true, error: null, data: null });
   const [selectedProjectId, setSelectedProjectId] = useState(initialReport?.projectId || null);
+  const [reportSourceMode] = useState('demo');
   const [portfolioNavigation, setPortfolioNavigation] = useState(null);
   const [deliveryNotice, setDeliveryNotice] = useState(null);
+  const [shareCreating, setShareCreating] = useState(false);
   const [facebook, setFacebook] = useState({ loading: true, connecting: false, error: null, data: null });
   const [facebookNotice, setFacebookNotice] = useState(null);
   const [auth, setAuth] = useState({ loading: true, submitting: false, error: null, configured: false, required: false, authenticated: false });
-  const appReady = !auth.loading && (!auth.required || auth.authenticated);
+  const appReady = !shareToken && !auth.loading && (!auth.required || auth.authenticated);
 
   const handleSessionExpiry = (err) => {
     if (err?.status !== 401) return false;
@@ -1339,10 +1485,11 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    if (shareToken) return;
     fetchAuthStatus()
       .then(data => setAuth({ loading: false, submitting: false, error: null, ...data }))
       .catch(() => setAuth(current => ({ ...current, loading: false, error: 'ตรวจสอบระบบล็อกอินไม่ได้ กรุณาตรวจว่า backend ทำงานอยู่' })));
-  }, []);
+  }, [shareToken]);
 
   const loadFacebookStatus = () => {
     setFacebook(current => ({ ...current, loading: true, error: null }));
@@ -1378,13 +1525,13 @@ export default function Dashboard() {
     if (!appReady) return undefined;
     let alive = true;
     setState({ loading: true, error: null, data: null });
-    fetchAnalysis(periodApplied)
+    fetchAnalysis({ ...periodApplied, demo: reportSourceMode === 'demo' })
       .then(data => { if (alive) setState({ loading: false, error: null, data }); })
       .catch(err => {
         if (alive && !handleSessionExpiry(err)) setState({ loading: false, error: err.message, data: null });
       });
     return () => { alive = false; };
-  }, [refreshKey, appReady, periodApplied]);
+  }, [refreshKey, appReady, periodApplied, reportSourceMode]);
 
   const loadPortfolio = () => {
     setPortfolio(current => ({ ...current, loading: true, error: null }));
@@ -1450,6 +1597,12 @@ export default function Dashboard() {
     setSelectedPost(null);
     setTier('overview');
     setDeliveryNotice(null);
+    const projectPeriods = (portfolio.data?.periods || []).filter(item => item.project_id === projectId).sort((a, b) => b.date_to.localeCompare(a.date_to));
+    const projectCampaigns = (portfolio.data?.campaigns || []).filter(item => item.project_id === projectId);
+    if (projectPeriods[0] && projectCampaigns.length) {
+      handleOpenReportPeriod({ since: projectPeriods[0].date_from, until: projectPeriods[0].date_to, projectId, periodId: projectPeriods[0].id, campaignIds: projectCampaigns.map(item => item.id) });
+      return;
+    }
     setPortfolioNavigation({ projectId });
     setView('portfolio');
     window.history.replaceState({}, '', window.location.pathname);
@@ -1463,11 +1616,22 @@ export default function Dashboard() {
     setView('portfolio');
   };
   const copyReportLink = async () => {
+    if (!periodApplied.projectId || !periodApplied.periodId || !periodApplied.campaignIds?.length) {
+      setDeliveryNotice({ type: 'error', message: 'ต้องเลือกรายงานแบบ Project + Period + Campaign ก่อนสร้างลิงก์ลูกค้า' });
+      return;
+    }
+    setShareCreating(true);
     try {
-      await navigator.clipboard.writeText(reportUrl(periodApplied));
-      setDeliveryNotice({ type: 'success', message: 'คัดลอกลิงก์แล้ว ผู้รับต้องเข้าสู่ระบบ Workspace ก่อนเปิดรายงาน' });
-    } catch {
-      setDeliveryNotice({ type: 'error', message: 'คัดลอกอัตโนมัติไม่ได้ กรุณาคัดลอก URL จากแถบที่อยู่' });
+      const created = await createReportShare({ since: periodApplied.since, until: periodApplied.until, project_id: periodApplied.projectId, period_id: periodApplied.periodId, campaign_ids: periodApplied.campaignIds, demo: reportSourceMode === 'demo', expires_days: 30 });
+      const url = new URL(window.location.href);
+      url.search = '';
+      url.searchParams.set('share', created.token);
+      await navigator.clipboard.writeText(url.toString());
+      setDeliveryNotice({ type: 'success', message: `สร้าง Client view แบบอ่านอย่างเดียวและคัดลอกแล้ว · หมดอายุ ${new Date(created.expires_at).toLocaleDateString('th-TH')}` });
+    } catch (err) {
+      if (!handleSessionExpiry(err)) setDeliveryNotice({ type: 'error', message: err.message || 'สร้างลิงก์ลูกค้าไม่สำเร็จ' });
+    } finally {
+      setShareCreating(false);
     }
   };
   const goPreviousTier = () => {
@@ -1523,6 +1687,8 @@ export default function Dashboard() {
   const selectedProject = portfolio.data?.projects.find(project => project.id === selectedProjectId) || null;
   const viewTitles = { report: 'Facebook Performance', portfolio: 'Brands & projects', sources: 'Data workspace' };
 
+  if (shareToken) return <PublicReportView token={shareToken} />;
+
   if (auth.loading) {
     return <main className="auth-shell" style={fontStyle}><div className="auth-loading"><LoaderCircle size={18} /> กำลังตรวจสอบพื้นที่ทำงาน...</div></main>;
   }
@@ -1569,7 +1735,7 @@ export default function Dashboard() {
                 <div>
                   <div className="report-title-line">
                     <h1>{data?.page?.name || 'Performance Analyzer'}</h1>
-                    {data?.demo && <span className="demo-badge">Demo data</span>}
+                    {data?.demo && <span className="demo-badge">Demo simulation</span>}
                   </div>
                   <p>
                     {data ? `${data.counts.total} posts · ${data.counts.boosted} boosted · ${data.counts.ads} pure ads · ${data.range.since} – ${data.range.until}` : 'กำลังเชื่อมต่อ backend...'}
@@ -1589,9 +1755,9 @@ export default function Dashboard() {
               {data?.scope && <div className="scope-evidence" role="status"><ShieldCheck size={16} /><div><strong>{data.scope.project_name} · {data.scope.period_label}</strong><span>{data.scope.campaigns.length} Campaigns จาก {new Set(data.scope.campaigns.map(campaign => `${campaign.source}:${campaign.source_account_id}`)).size} accounts ผ่าน backend validation</span></div></div>}
 
               <section className="report-delivery" aria-label="ส่งออกรายงาน">
-                <div><strong>ส่งรายงานให้ลูกค้า</strong><span>CSV สำหรับตรวจข้อมูล · Print ใช้บันทึกเป็น PDF · ลิงก์ภายในยังต้องเข้าสู่ระบบ</span></div>
+                <div><strong>ส่งรายงานให้ลูกค้า</strong><span>CSV สำหรับตรวจข้อมูล · PDF สำหรับส่งไฟล์ · Client link เป็น snapshot อ่านอย่างเดียว 30 วัน</span></div>
                 <div className="report-delivery-actions">
-                  <button type="button" onClick={copyReportLink} disabled={!data}><Share2 size={15} /> คัดลอกลิงก์</button>
+                  <button type="button" onClick={copyReportLink} disabled={!data || shareCreating}>{shareCreating ? <LoaderCircle className="button-spinner" size={15} /> : <Share2 size={15} />} {shareCreating ? 'กำลังสร้าง...' : 'สร้าง Client link'}</button>
                   <button type="button" onClick={() => data && downloadCsv(data, mode, selectedProject)} disabled={!data}><Download size={15} /> Export CSV</button>
                   <button type="button" onClick={() => window.print()} disabled={!data}><Printer size={15} /> บันทึก PDF</button>
                 </div>
@@ -1621,7 +1787,7 @@ export default function Dashboard() {
                 )}
                 {data && !loading && (
                   <>
-                    {tier === 'overview' && <TierOverview data={data} mode={mode} onSelectPost={handleSelect} />}
+                    {tier === 'overview' && <><TierOverview data={data} mode={mode} onSelectPost={handleSelect} /><CampaignResultsTable data={data} onRefresh={() => setRefreshKey(key => key + 1)} onSessionExpiry={handleSessionExpiry} /></>}
                     {tier === 'split' && <TierAdsOrganic data={data} />}
                     {tier === 'post' && selectedPost && <TierPostDetail post={selectedPost} baseline={data.baseline} />}
                   </>
@@ -1635,6 +1801,7 @@ export default function Dashboard() {
               {data && <div className="print-report" aria-hidden="true">
                 <h2>Overview</h2>
                 <TierOverview data={data} mode={mode} onSelectPost={() => {}} />
+                <CampaignResultsTable data={data} readOnly />
                 <h2>Ads vs Organic</h2>
                 <TierAdsOrganic data={data} />
                 {selectedPost && <><h2>Post deep-dive</h2><TierPostDetail post={selectedPost} baseline={data.baseline} /></>}

@@ -128,3 +128,31 @@ export function deleteReportElement(projectId, elementId) {
     method: 'DELETE',
   });
 }
+
+export function updateCampaignMetrics(projectId, payload) {
+  return requestJson(`/api/projects/${encodeURIComponent(projectId)}/campaign-metrics`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createCustomMetric(projectId, payload) {
+  return requestJson(`/api/projects/${encodeURIComponent(projectId)}/custom-metrics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createReportShare(payload) {
+  return requestJson('/api/report-shares', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchPublicReport(token) {
+  return requestJson(`/api/public/reports/${encodeURIComponent(token)}`);
+}

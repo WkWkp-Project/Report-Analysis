@@ -74,6 +74,23 @@ body {
 .auth-error svg { flex: 0 0 auto; margin-top: 1px; }
 .auth-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 24px; padding-top: 17px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.55; }
 .auth-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--teal); }
+.client-report-shell { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 34px 0 64px; color: var(--ink); }
+.client-report-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 14px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.client-report-brand { margin-bottom: 8px; color: var(--teal); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+.client-report-header h1 { margin: 0; font-size: clamp(23px, 3vw, 34px); font-weight: 600; letter-spacing: -.025em; }
+.client-report-header p { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+.client-report-actions { display: flex; align-items: center; gap: 8px; }
+.client-report-actions > span,
+.client-report-actions button { min-height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 8px; font-size: 10px; }
+.client-report-actions > span { background: var(--teal-soft); color: var(--teal); }
+.client-report-actions button { border: 1px solid var(--line); background: white; color: var(--muted); cursor: pointer; }
+.client-report-meta { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 22px; padding: 10px 12px; border-radius: 10px; background: #1f2927; color: #d6ebe6; font-size: 10px; line-height: 1.5; }
+.client-report-meta svg { flex: 0 0 auto; margin-top: 1px; color: #9ce3d5; }
+.client-report-state { min-height: 70vh; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.client-report-state.error { flex-direction: column; color: var(--danger); }
+.client-report-state.error span { color: var(--muted); }
+.client-report-section { margin-top: 28px; }
+.client-report-section > h2 { margin: 0 0 10px; font-size: 16px; }
 .auth-loading { display: flex; align-items: center; gap: 9px; padding: 14px 16px; border-radius: 12px; background: var(--surface); color: var(--muted); font-size: 12px; box-shadow: 0 14px 40px rgba(28, 25, 23, 0.12); }
 .auth-loading svg { animation: spin 900ms linear infinite; }
 
@@ -359,6 +376,52 @@ label:focus-within {
 .funnel-metric-head small { flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; background: var(--canvas); color: var(--faint); font-size: 9px; font-weight: 500; letter-spacing: 0; text-transform: none; }
 .funnel-metric-value { margin-top: 6px; color: var(--ink); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: clamp(18px, 2vw, 23px); font-weight: 500; line-height: 1.2; }
 .funnel-metric-sub { min-height: 15px; margin-top: 5px; color: var(--faint); font-size: 10px; line-height: 1.5; }
+.campaign-results { margin: 24px 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.campaign-results-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.campaign-results-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 600; }
+.campaign-results-heading h2 svg { color: var(--teal); }
+.campaign-results-heading p { max-width: 72ch; margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.campaign-admin-actions { display: flex; gap: 5px; flex: 0 0 auto; }
+.campaign-admin-actions button { min-height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: #faf9f7; color: var(--muted); font-size: 10px; cursor: pointer; }
+.campaign-admin-actions button:hover:not(:disabled) { border-color: #9ac9bf; color: var(--teal); }
+.campaign-admin-actions button.save { border-color: var(--teal); background: var(--teal); color: white; }
+.campaign-admin-actions button:disabled { cursor: wait; opacity: .56; }
+.override-reason { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid #ece9e4; background: #fffaf0; color: #6d4c16; font-size: 10px; }
+.override-reason input { flex: 1; min-width: 180px; min-height: 34px; padding: 6px 9px; border: 1px solid #d7c9aa; border-radius: 8px; background: white; color: var(--ink); font-size: 11px; }
+.formula-builder { display: grid; grid-template-columns: minmax(140px, .8fr) minmax(140px, .8fr) minmax(240px, 1.6fr) 120px auto; gap: 9px; align-items: end; padding: 13px 18px; border-bottom: 1px solid #c9e4de; background: #f1faf7; }
+.formula-builder label { display: flex; flex-direction: column; gap: 4px; color: #41645e; font-size: 9px; }
+.formula-builder input,
+.formula-builder select { min-width: 0; min-height: 36px; padding: 7px 9px; border: 1px solid #aed2ca; border-radius: 8px; background: white; color: var(--ink); font-size: 11px; }
+.formula-builder small { min-height: 14px; color: #53736d; font-size: 8px; line-height: 1.4; }
+.campaign-results > .inline-error { margin: 10px 18px; }
+.campaign-table-scroll { max-width: 100%; overflow: auto; }
+.campaign-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 10px; }
+.campaign-table th,
+.campaign-table td { min-width: 105px; padding: 10px 11px; border-bottom: 1px solid #efede9; border-right: 1px solid #f1efeb; color: #494440; text-align: right; vertical-align: middle; white-space: nowrap; }
+.campaign-table th:first-child,
+.campaign-table td:first-child { position: sticky; left: 0; z-index: 1; min-width: 190px; max-width: 240px; background: var(--surface); text-align: left; }
+.campaign-table thead th { position: sticky; top: 0; z-index: 2; background: #f5f3ef; color: var(--muted); font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .035em; }
+.campaign-table thead th:first-child { z-index: 3; background: #f0eee9; }
+.campaign-table tbody tr:last-child th,
+.campaign-table tbody tr:last-child td { border-bottom: 0; }
+.campaign-table tbody tr:hover td,
+.campaign-table tbody tr:hover th { background: #fbfefc; }
+.campaign-table tbody th strong,
+.campaign-table tbody th small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.campaign-table tbody th strong { font-size: 11px; font-weight: 600; }
+.campaign-table tbody th small { margin-top: 3px; color: var(--faint); font-size: 8px; }
+.campaign-table td { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.campaign-table td.calculated,
+.campaign-table th.calculated { background: #faf9f7; }
+.campaign-table td.custom,
+.campaign-table th.custom { background: #f1faf7; }
+.campaign-table thead th small { display: block; max-width: 120px; margin-top: 3px; overflow: hidden; color: var(--faint); font-size: 7px; letter-spacing: 0; text-overflow: ellipsis; text-transform: none; }
+.campaign-table td.manual { background: #fff9e9; }
+.campaign-table td > small { display: block; margin-top: 3px; color: #94631b; font-family: "IBM Plex Sans Thai", sans-serif; font-size: 7px; }
+.campaign-table input { width: 92px; min-height: 32px; padding: 5px 6px; border: 1px solid #c9a967; border-radius: 7px; background: white; color: var(--ink); font-family: "IBM Plex Mono", monospace; font-size: 10px; text-align: right; }
+.campaign-table input:focus { border-color: var(--teal); outline: 3px solid rgba(15,118,110,.15); }
+.record-source { display: inline-flex; padding: 4px 6px; border-radius: 7px; background: #efede9; color: var(--muted); font-family: "IBM Plex Sans Thai", sans-serif; font-size: 8px; }
+.record-source.demo { background: #fef3c7; color: #854d0e; }
 
 @keyframes report-settle {
   from { transform: translateY(5px); filter: blur(2px); }
@@ -717,6 +780,16 @@ label:focus-within {
   .auth-brand { margin-bottom: 34px; }
   .auth-heading { padding-left: 0; }
   .auth-lock { position: static; margin-bottom: 13px; }
+  .client-report-shell { width: calc(100% - 28px); padding-top: 20px; }
+  .client-report-header { align-items: flex-start; flex-direction: column; }
+  .client-report-actions { width: 100%; justify-content: space-between; }
+  .campaign-results-heading { align-items: stretch; flex-direction: column; }
+  .campaign-admin-actions { flex-wrap: wrap; }
+  .campaign-admin-actions button { flex: 1 1 120px; justify-content: center; }
+  .formula-builder { grid-template-columns: 1fr 1fr; }
+  .formula-expression { grid-column: 1 / -1; }
+  .formula-builder .primary-action { width: 100%; }
+  .override-reason { align-items: stretch; flex-direction: column; }
 
   .workspace-sidebar { padding: 9px 12px; overflow-x: auto; }
   .workspace-brand { margin-right: 8px; }
@@ -837,10 +910,12 @@ label:focus-within {
   .connector-actions { align-items: stretch; flex-direction: column; }
   .connector-actions .secondary-action,
   .connector-actions .text-action { justify-content: center; }
+  .formula-builder { grid-template-columns: 1fr; }
+  .formula-expression { grid-column: auto; }
 }
 
 @media print {
-  @page { size: A4; margin: 12mm; }
+  @page { size: A4 landscape; margin: 10mm; }
   body { background: white !important; }
   .app-shell { display: block; min-height: auto; }
   .workspace-sidebar,
@@ -854,10 +929,21 @@ label:focus-within {
   .report-flow-actions,
   .element-composer,
   .element-actions,
-  .elements-locked { display: none !important; }
+  .elements-locked,
+  .campaign-admin-actions,
+  .formula-builder,
+  .override-reason { display: none !important; }
   .workspace-content { width: 100%; padding: 0; }
   .report-header { padding-bottom: 12px; }
   .print-report { display: block; }
+  .client-report-shell { width: 100%; padding: 0; }
+  .client-report-actions { display: none; }
+  .campaign-table-scroll { overflow: visible; }
+  .campaign-table { width: 100%; font-size: 7px; }
+  .campaign-table th,
+  .campaign-table td { min-width: 0; padding: 5px 4px; }
+  .campaign-table th:first-child,
+  .campaign-table td:first-child { position: static; min-width: 110px; }
   .print-report > h2 { margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #d6d3d1; font-size: 16px; }
   .print-report button { color: inherit; }
   .report-elements { break-before: page; }

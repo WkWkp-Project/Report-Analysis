@@ -12,6 +12,7 @@ Endpoints
 """
 
 import hmac
+import json
 import logging
 import os
 from datetime import date, timedelta
@@ -22,7 +23,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app_security import RateLimiter, SecuritySettings, SessionManager, SESSION_COOKIE
 from import_pipeline.models import ImportStage, SourceKind
@@ -42,6 +43,13 @@ from report_elements import (
     ReportElementStore,
     ReportElementUpdate,
 )
+from metric_workspace import (
+    CustomMetricCreate,
+    MetricOverrideUpsert,
+    MetricWorkspaceError,
+    MetricWorkspaceStore,
+)
+from report_shares import ReportShareError, ReportShareStore
 from scoring import PostScorer, calculate_baseline
 from serializer import build_payload
 import topic_extractor
@@ -54,6 +62,8 @@ session_manager = SessionManager(security_settings)
 rate_limiter = RateLimiter()
 portfolio_store = PortfolioStore()
 report_element_store = ReportElementStore()
+metric_workspace_store = MetricWorkspaceStore()
+report_share_store = ReportShareStore()
 
 app = FastAPI(
     title="FB Performance Analyzer API",
@@ -114,6 +124,23 @@ async def security_middleware(request: Request, call_next):
 
 class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=256)
+
+
+class ReportShareCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    since: date
+    until: date
+    project_id: str = Field(min_length=1, max_length=80)
+    period_id: str = Field(min_length=1, max_length=80)
+    campaign_ids: list[str] = Field(min_length=1, max_length=200)
+    demo: bool = True
+    expires_days: int = Field(default=30, ge=1, le=90)
+
+    @model_validator(mode="after")
+    def valid_range(self):
+        if self.since > self.until:
+            raise ValueError("since must not be after until")
+        return self
 
 
 def _client_key(request: Request, action: str) -> str:
@@ -226,6 +253,124 @@ def _run_pipeline(posts_raw: list, page_info: dict, since: str, until: str) -> d
     payload = build_payload(posts_raw, scores, baseline, page_info, since, until)
     _enrich_with_claude(payload, posts_raw)
     return payload
+
+
+def _attach_campaign_results(
+    payload: dict,
+    posts_raw: list[dict],
+    analysis_scope: dict | None,
+    source_label: str,
+) -> None:
+    """Build a transparent campaign ledger; demo rows use deterministic post allocation."""
+    if not analysis_scope:
+        payload["campaign_results"] = []
+        payload["custom_metrics"] = []
+        payload["campaign_overview"] = None
+        return
+    campaigns = analysis_scope["campaigns"]
+    paid_posts = [post for post in posts_raw if post.get("post_class") in ("boosted", "ad_only")]
+    rows = []
+    for index, campaign in enumerate(campaigns):
+        assigned = [post for post_index, post in enumerate(paid_posts) if post_index % len(campaigns) == index]
+        revenue_values = [
+            post.get("ad_revenue")
+            if post.get("ad_revenue") is not None
+            else (post.get("ad_spend") or 0) * post.get("ad_roas")
+            for post in assigned
+            if post.get("ad_revenue") is not None or post.get("ad_roas") is not None
+        ]
+        rows.append(
+            {
+                "campaign_id": campaign["id"],
+                "campaign_name": campaign["name"],
+                "source": campaign["source"],
+                "source_account_id": campaign["source_account_id"],
+                "source_campaign_id": campaign["source_campaign_id"],
+                "record_source": source_label,
+                "impressions": sum((post.get("ad_impressions") or post.get("impressions") or 0) for post in assigned),
+                "reach": sum((post.get("ad_reach") or post.get("reach") or 0) for post in assigned),
+                "engagement": sum((post.get("engaged_users") or 0) for post in assigned),
+                "link_clicks": sum((post.get("link_clicks") or 0) for post in assigned),
+                "spend": round(sum((post.get("ad_spend") or 0) for post in assigned), 2),
+                "purchases": round(sum((post.get("ad_purchases") or 0) for post in assigned), 2),
+                "revenue": round(sum(revenue_values), 2),
+                "post_count": len(assigned),
+            }
+        )
+    try:
+        applied, definitions = metric_workspace_store.apply(
+            analysis_scope["project_id"], analysis_scope["period_id"], rows
+        )
+    except MetricWorkspaceError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    payload["campaign_results"] = applied
+    payload["custom_metrics"] = definitions
+    impressions = sum(row.get("impressions") or 0 for row in applied)
+    reach = sum(row.get("reach") or 0 for row in applied)
+    engagement = sum(row.get("engagement") or 0 for row in applied)
+    link_clicks = sum(row.get("link_clicks") or 0 for row in applied)
+    spend = sum(row.get("spend") or 0 for row in applied)
+    purchases = sum(row.get("purchases") or 0 for row in applied)
+    revenue = sum(row.get("revenue") or 0 for row in applied)
+    conversion_spend = sum(
+        row.get("spend") or 0 for row in applied if (row.get("revenue") or 0) > 0
+    )
+    manual_fields = sorted({field for row in applied for field in row.get("manual_fields", [])})
+    payload["campaign_overview"] = {
+        "impressions_total": impressions,
+        "reach_total": reach,
+        "reach_organic": 0,
+        "reach_paid": reach,
+        "frequency": round(impressions / reach, 2) if reach else None,
+        "engagement_total": engagement,
+        "avg_er": round(engagement / reach * 100, 2) if reach else None,
+        "link_clicks_total": link_clicks,
+        "link_ctr": round(link_clicks / impressions * 100, 2) if impressions else None,
+        "spend_total": round(spend, 2) if spend else None,
+        "cpm": round(spend / impressions * 1000, 2) if spend and impressions else None,
+        "cpe": round(spend / engagement, 2) if spend and engagement else None,
+        "purchases": round(purchases, 2),
+        "revenue": round(revenue, 2),
+        "conversion_spend": round(conversion_spend, 2) if conversion_spend else None,
+        "revenue_source": "manual_or_import" if "revenue" in manual_fields else "meta_action_values",
+        "roas": round(revenue / conversion_spend, 2) if revenue and conversion_spend else None,
+        "roi": round((revenue - conversion_spend) / conversion_spend * 100, 2) if revenue and conversion_spend else None,
+        "manual_fields": manual_fields,
+    }
+
+
+def _demo_payload(since_date: date, until_date: date, analysis_scope: dict | None) -> dict:
+    from sample_data import sample_page_info, sample_posts
+
+    posts_raw = sample_posts(
+        start_date=since_date,
+        span_days=(until_date - since_date).days + 1,
+    )
+    payload = _run_pipeline(
+        posts_raw,
+        sample_page_info(),
+        str(since_date),
+        str(until_date),
+    )
+    payload["demo"] = True
+    payload["scope"] = analysis_scope
+    _attach_campaign_results(payload, posts_raw, analysis_scope, "demo")
+    return payload
+
+
+def _public_snapshot(payload: dict) -> dict:
+    """Strip provider identifiers and mark the immutable client-facing copy read-only."""
+    safe = json.loads(json.dumps(payload))
+    for campaign in (safe.get("scope") or {}).get("campaigns", []):
+        campaign.pop("source_account_id", None)
+        campaign.pop("source_campaign_id", None)
+    for row in safe.get("campaign_results", []):
+        row.pop("source_account_id", None)
+        row.pop("source_campaign_id", None)
+        row.pop("override_reason", None)
+        row.pop("override_updated_at", None)
+    safe["read_only"] = True
+    return safe
 
 
 def _enrich_with_claude(payload: dict, posts_raw: list) -> None:
@@ -548,6 +693,58 @@ def facebook_disconnect(request: Request):
     return {"disconnected": deleted}
 
 
+@app.patch("/api/projects/{project_id}/campaign-metrics")
+def update_campaign_metrics(project_id: str, payload: MetricOverrideUpsert, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="metric_override", limit=60, window_seconds=60)
+    _resolve_analysis_scope(project_id, payload.period_id, [payload.campaign_id])
+    try:
+        return metric_workspace_store.upsert_override(project_id, payload)
+    except MetricWorkspaceError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/custom-metrics", status_code=201)
+def create_custom_metric(project_id: str, payload: CustomMetricCreate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="custom_metric", limit=20, window_seconds=60)
+    _require_project(project_id)
+    try:
+        return metric_workspace_store.create_custom_metric(project_id, payload)
+    except MetricWorkspaceError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/report-shares", status_code=201)
+def create_report_share(payload: ReportShareCreate, request: Request):
+    _require_authenticated(request)
+    _enforce_rate_limit(request, action="report_share", limit=10, window_seconds=60)
+    scope = _resolve_analysis_scope(payload.project_id, payload.period_id, payload.campaign_ids)
+    if not payload.demo:
+        raise HTTPException(
+            status_code=501,
+            detail="การสร้าง snapshot จากข้อมูลจริงจะเปิดพร้อม scoped Ads Insights connector",
+        )
+    report = _demo_payload(payload.since, payload.until, scope)
+    created = report_share_store.create(_public_snapshot(report), payload.expires_days)
+    return created
+
+
+@app.get("/api/public/reports/{token}")
+def public_report(token: str, request: Request):
+    _enforce_rate_limit(request, action="public_report", limit=60, window_seconds=60)
+    try:
+        record = report_share_store.get(token)
+    except ReportShareError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "id": record["id"],
+        "created_at": record["created_at"],
+        "expires_at": record["expires_at"],
+        "report": record["payload"],
+    }
+
+
 @app.get("/api/analyze")
 def analyze(
     request: Request,
@@ -571,13 +768,7 @@ def analyze(
     use_demo = bool(demo) or not _has_credentials()
 
     if use_demo:
-        from sample_data import sample_posts, sample_page_info
-        posts_raw = sample_posts(start_date=since_date, span_days=(until_date - since_date).days + 1)
-        page_info = sample_page_info()
-        payload = _run_pipeline(posts_raw, page_info, since_value, until_value)
-        payload["demo"] = True
-        payload["scope"] = analysis_scope
-        return payload
+        return _demo_payload(since_date, until_date, analysis_scope)
 
     if analysis_scope:
         raise HTTPException(
@@ -593,6 +784,7 @@ def analyze(
         payload = _run_pipeline(posts_raw, page_info, since_value, until_value)
         payload["demo"] = False
         payload["scope"] = None
+        _attach_campaign_results(payload, posts_raw, None, "meta_api")
         return payload
     except Exception:
         logger.exception("Facebook analysis pipeline failed")

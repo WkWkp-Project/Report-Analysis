@@ -82,3 +82,11 @@ Quality gate ตรวจอย่างน้อย:
 5. สร้าง report views และ export
 
 หากมีการแก้ mapping, scope หรือไฟล์ ระบบต้องสร้าง dataset version ใหม่และวิเคราะห์ใหม่ ไม่แก้ผลเดิมแบบเงียบ ๆ
+
+## 7. Admin correction and custom metrics
+
+หลัง dataset ผ่าน `analysis_ready` แล้ว แอดมินสามารถแก้ base metric ระดับ campaign ได้ โดยระบบต้องเก็บ field ที่แก้ เหตุผล ผู้แก้ และเวลาแก้ ไม่เขียนทับ raw import/API อย่างเงียบ ๆ จากนั้นคำนวณ derived metric ใหม่จากค่าฐาน เช่น CTR, CPM, ROAS และ ROI
+
+Custom metric ใช้สูตรคณิตศาสตร์แบบจำกัดเฉพาะ canonical metric fields และตัวดำเนินการ `+ - * / %` ไม่อนุญาต function call หรือโค้ด สูตรต้องถูก validate ก่อนบันทึก และผลหารด้วยศูนย์ต้องแสดงเป็นข้อมูลที่คำนวณไม่ได้แทนการทำให้รายงานล้ม
+
+ตาราง Included campaigns คือจุดตรวจสุดท้ายก่อนแชร์หรือ export โดยต้องแสดงทุก campaign ที่อยู่ใน scope, แหล่งข้อมูล, metric ที่แก้ด้วยคน และ metric ที่คำนวณจากสูตรอย่างแยกแยะได้

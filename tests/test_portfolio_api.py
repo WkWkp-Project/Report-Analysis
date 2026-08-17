@@ -8,6 +8,8 @@ import server
 from app_security import RateLimiter, SecuritySettings, SessionManager
 from portfolio import PortfolioStore
 from report_elements import ReportElementStore
+from metric_workspace import MetricWorkspaceStore
+from report_shares import ReportShareStore
 
 
 class PortfolioApiSecurityTests(unittest.TestCase):
@@ -18,6 +20,8 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         self.original_limiter = server.rate_limiter
         self.original_store = server.portfolio_store
         self.original_element_store = server.report_element_store
+        self.original_metric_store = server.metric_workspace_store
+        self.original_share_store = server.report_share_store
         settings = SecuritySettings(
             environment="production",
             password="portfolio-test-password",
@@ -28,6 +32,8 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         server.rate_limiter = RateLimiter()
         server.portfolio_store = PortfolioStore(Path(self.directory.name))
         server.report_element_store = ReportElementStore(Path(self.directory.name))
+        server.metric_workspace_store = MetricWorkspaceStore(Path(self.directory.name))
+        server.report_share_store = ReportShareStore(Path(self.directory.name))
         self.client = TestClient(server.app)
 
     def tearDown(self):
@@ -37,6 +43,8 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         server.rate_limiter = self.original_limiter
         server.portfolio_store = self.original_store
         server.report_element_store = self.original_element_store
+        server.metric_workspace_store = self.original_metric_store
+        server.report_share_store = self.original_share_store
         self.directory.cleanup()
 
     def login(self):
@@ -173,6 +181,49 @@ class PortfolioApiSecurityTests(unittest.TestCase):
             response.json()["range"],
             {"since": "2026-08-01", "until": "2026-08-07"},
         )
+
+    def test_campaign_override_custom_metric_and_read_only_share(self):
+        self.login()
+        brand_id, project_id = self.create_project()
+        period = self.client.post(
+            "/api/portfolio/periods",
+            json={"project_id": project_id, "label": "August", "date_from": "2026-08-01", "date_to": "2026-08-31"},
+        ).json()["periods"][0]
+        campaign = self.client.post(
+            "/api/portfolio/campaigns",
+            json={"project_id": project_id, "source": "facebook", "source_account_id": "act_1", "source_campaign_id": "external_1", "name": "Sales", "brand_ids": [brand_id]},
+        ).json()["campaigns"][0]
+
+        override = self.client.patch(
+            f"/api/projects/{project_id}/campaign-metrics",
+            json={"period_id": period["id"], "campaign_id": campaign["id"], "values": {"revenue": 9999}, "reason": "Matched CRM total"},
+        )
+        self.assertEqual(override.status_code, 200)
+        custom = self.client.post(
+            f"/api/projects/{project_id}/custom-metrics",
+            json={"key": "cost_per_purchase", "label": "Cost per purchase", "formula": "spend / purchases", "unit": "currency"},
+        )
+        self.assertEqual(custom.status_code, 201)
+
+        shared = self.client.post(
+            "/api/report-shares",
+            json={"since": "2026-08-01", "until": "2026-08-31", "project_id": project_id, "period_id": period["id"], "campaign_ids": [campaign["id"]], "demo": True},
+        )
+        self.assertEqual(shared.status_code, 201)
+        token = shared.json()["token"]
+        self.client.post("/api/auth/logout")
+        public = self.client.get(f"/api/public/reports/{token}")
+        self.assertEqual(public.status_code, 200)
+        report = public.json()["report"]
+        self.assertTrue(report["read_only"])
+        self.assertEqual(report["campaign_results"][0]["revenue"], 9999)
+        self.assertEqual(report["campaign_overview"]["revenue"], 9999)
+        self.assertNotIn("source_account_id", report["campaign_results"][0])
+        blocked = self.client.patch(
+            f"/api/projects/{project_id}/campaign-metrics",
+            json={"period_id": period["id"], "campaign_id": campaign["id"], "values": {"revenue": 1}, "reason": "blocked"},
+        )
+        self.assertEqual(blocked.status_code, 401)
 
 
 if __name__ == "__main__":
