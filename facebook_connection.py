@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from cryptography.fernet import Fernet, InvalidToken
@@ -33,6 +33,8 @@ DEFAULT_SCOPES = (
     "ads_read",
 )
 STATE_TTL_SECONDS = 600
+GRAPH_HOST = "graph.facebook.com"
+SENSITIVE_QUERY_KEYS = {"access_token", "appsecret_proof", "client_secret"}
 
 
 class FacebookConnectionError(RuntimeError):
@@ -193,6 +195,7 @@ class FacebookOAuthService:
                 "code": code,
             },
             include_proof=False,
+            method="POST",
         )
         access_token = short_lived.get("access_token")
         if not access_token:
@@ -207,6 +210,7 @@ class FacebookOAuthService:
                 "fb_exchange_token": access_token,
             },
             include_proof=False,
+            method="POST",
         )
         long_lived_token = token_data.get("access_token") or access_token
         user = self._request_json(
@@ -302,6 +306,7 @@ class FacebookOAuthService:
         next_url: str | None = url
         next_params: dict[str, Any] = {**params, "limit": 100}
         while next_url:
+            next_url = _validated_graph_url(next_url)
             response = self._request_json(
                 next_url, params=next_params, access_token=access_token
             )
@@ -316,10 +321,13 @@ class FacebookOAuthService:
         params: dict[str, Any],
         access_token: str | None = None,
         include_proof: bool = True,
+        method: str = "GET",
     ) -> dict[str, Any]:
+        safe_url = _validated_graph_url(url)
         request_params = dict(params)
+        headers: dict[str, str] = {"Accept": "application/json"}
         if access_token:
-            request_params["access_token"] = access_token
+            headers["Authorization"] = f"Bearer {access_token}"
             if include_proof:
                 request_params["appsecret_proof"] = hmac.new(
                     self.config.app_secret.encode("utf-8"),
@@ -327,16 +335,22 @@ class FacebookOAuthService:
                     hashlib.sha256,
                 ).hexdigest()
         try:
-            response = requests.get(url, params=request_params, timeout=30)
+            if method == "POST":
+                response = requests.post(
+                    safe_url, data=request_params, headers=headers, timeout=30
+                )
+            else:
+                response = requests.get(
+                    safe_url, params=request_params, headers=headers, timeout=30
+                )
             data = response.json()
         except (requests.RequestException, ValueError) as exc:
             raise FacebookConnectionError("ติดต่อ Meta ไม่สำเร็จ กรุณาลองอีกครั้ง") from exc
         if not response.ok or "error" in data:
             meta_error = data.get("error", {})
-            message = meta_error.get("message", "Meta ปฏิเสธคำขอ")
             code = meta_error.get("code")
             suffix = f" (code {code})" if code else ""
-            raise FacebookConnectionError(f"{message}{suffix}")
+            raise FacebookConnectionError(f"Meta ปฏิเสธคำขอ{suffix}")
         return data
 
 
@@ -377,3 +391,28 @@ def _b64encode(value: bytes) -> str:
 
 def _b64decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def _validated_graph_url(url: str) -> str:
+    """Allow only HTTPS Graph API URLs and strip credentials from pagination links."""
+    parsed = urlsplit(url)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise FacebookConnectionError("Meta ส่ง pagination URL ที่ไม่ปลอดภัย") from exc
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != GRAPH_HOST
+        or parsed.username
+        or parsed.password
+        or port not in (None, 443)
+    ):
+        raise FacebookConnectionError("Meta ส่ง pagination URL ที่ไม่ปลอดภัย")
+    clean_query = urlencode(
+        [
+            (key, value)
+            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+            if key.lower() not in SENSITIVE_QUERY_KEYS
+        ]
+    )
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, clean_query, ""))

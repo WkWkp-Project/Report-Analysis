@@ -9,6 +9,7 @@ from facebook_connection import (
     FacebookConfig,
     FacebookConnectionError,
     FacebookOAuthService,
+    _validated_graph_url,
     sanitize_connection,
 )
 
@@ -112,6 +113,52 @@ class FacebookConnectionTests(unittest.TestCase):
             self.assertFalse(status["configured"])
             self.assertFalse(status["connected"])
             self.assertEqual(status["required_environment"], ["FB_APP_ID", "FB_APP_SECRET"])
+
+    def test_graph_request_uses_bearer_header_not_query_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service = FacebookOAuthService(self.config(Path(directory)))
+            response = Mock(ok=True)
+            response.json.return_value = {"data": []}
+            with patch("facebook_connection.requests.get", return_value=response) as request:
+                service._request_json(
+                    "https://graph.facebook.com/v25.0/me",
+                    params={"fields": "id"},
+                    access_token="secret-token",
+                )
+
+            kwargs = request.call_args.kwargs
+            self.assertEqual(kwargs["headers"]["Authorization"], "Bearer secret-token")
+            self.assertNotIn("access_token", kwargs["params"])
+            self.assertIn("appsecret_proof", kwargs["params"])
+
+    def test_oauth_exchange_posts_secrets_in_body(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service = FacebookOAuthService(self.config(Path(directory)))
+            response = Mock(ok=True)
+            response.json.return_value = {"access_token": "token"}
+            with patch("facebook_connection.requests.post", return_value=response) as request:
+                service._request_json(
+                    "https://graph.facebook.com/v25.0/oauth/access_token",
+                    params={"client_secret": "secret"},
+                    include_proof=False,
+                    method="POST",
+                )
+
+            self.assertEqual(request.call_args.kwargs["data"]["client_secret"], "secret")
+            self.assertNotIn("params", request.call_args.kwargs)
+
+    def test_pagination_url_is_host_allowlisted_and_credentials_are_stripped(self):
+        clean = _validated_graph_url(
+            "https://graph.facebook.com/v25.0/me/accounts?after=cursor&access_token=secret"
+        )
+        self.assertEqual(
+            clean,
+            "https://graph.facebook.com/v25.0/me/accounts?after=cursor",
+        )
+        with self.assertRaises(FacebookConnectionError):
+            _validated_graph_url("https://attacker.example/collect?access_token=secret")
+        with self.assertRaises(FacebookConnectionError):
+            _validated_graph_url("https://graph.facebook.com:invalid/page")
 
 
 if __name__ == "__main__":
