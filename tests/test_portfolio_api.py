@@ -238,6 +238,14 @@ class PortfolioApiSecurityTests(unittest.TestCase):
         analysis = self.client.get(f"/api/analyze?demo=1&report_id={report_id}")
         self.assertEqual(analysis.status_code, 200)
         self.assertEqual(analysis.json()["report"]["brand_id"], brand_id)
+        self.assertEqual(analysis.json()["campaign_results"][0]["campaign_id"], "report_total")
+        override = self.client.patch(
+            f"/api/projects/{report_id}/campaign-metrics",
+            json={"period_id": report_id, "campaign_id": "report_total", "values": {"revenue": 54321}, "reason": "Matched sales file"},
+        )
+        self.assertEqual(override.status_code, 200)
+        refreshed = self.client.get(f"/api/analyze?demo=1&report_id={report_id}").json()
+        self.assertEqual(refreshed["campaign_overview"]["revenue"], 54321)
         published = self.client.post(f"/api/reports/{report_id}/publish", json={"demo": True, "note": "approved"})
         self.assertEqual(published.status_code, 200)
         self.assertEqual(published.json()["revision"]["version"], 1)

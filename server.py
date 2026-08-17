@@ -355,6 +355,10 @@ def _attach_campaign_results(
         )
     except MetricWorkspaceError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    _set_result_rows(payload, applied, definitions)
+
+
+def _set_result_rows(payload: dict, applied: list[dict], definitions: list[dict]) -> None:
     payload["campaign_results"] = applied
     payload["custom_metrics"] = definitions
     impressions = sum(row.get("impressions") or 0 for row in applied)
@@ -389,6 +393,32 @@ def _attach_campaign_results(
         "roi": round((revenue - conversion_spend) / conversion_spend * 100, 2) if revenue and conversion_spend else None,
         "manual_fields": manual_fields,
     }
+
+
+def _attach_report_total(payload: dict, report: dict) -> None:
+    """Keep the detailed metric ledger available when Brand + Period has no campaign scope."""
+    overview = payload.get("overview") or {}
+    row = {
+        "campaign_id": "report_total",
+        "campaign_name": "ยอดรวมรายงาน",
+        "source": "report",
+        "source_account_id": "",
+        "source_campaign_id": "",
+        "record_source": "demo" if payload.get("demo") else "blended",
+        "impressions": overview.get("impressions_total"),
+        "reach": overview.get("reach_total"),
+        "engagement": overview.get("engagement_total"),
+        "link_clicks": overview.get("link_clicks_total"),
+        "spend": overview.get("spend_total"),
+        "purchases": overview.get("purchases"),
+        "revenue": overview.get("revenue"),
+        "post_count": (payload.get("counts") or {}).get("total", 0),
+    }
+    try:
+        applied, definitions = metric_workspace_store.apply(report["id"], report["id"], [row])
+    except MetricWorkspaceError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    _set_result_rows(payload, applied, definitions)
 
 
 def _demo_payload(since_date: date, until_date: date, analysis_scope: dict | None) -> dict:
@@ -653,6 +683,8 @@ def report_library_publish(report_id: str, payload: ReportPublish, request: Requ
             raise HTTPException(status_code=501, detail="ข้อมูลจริงต้องผ่าน import validation ก่อน Publish")
         analysis = _demo_payload(date.fromisoformat(report["date_from"]), date.fromisoformat(report["date_to"]), _library_analysis_scope(report))
         analysis["report"] = {key: report[key] for key in ("id", "brand_id", "name", "date_from", "date_to")}
+        if not analysis.get("scope"):
+            _attach_report_total(analysis, report)
         return report_library_store.publish(report_id, _public_snapshot(analysis), payload.note)
     except ReportLibraryError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -816,7 +848,14 @@ def facebook_disconnect(request: Request):
 def update_campaign_metrics(project_id: str, payload: MetricOverrideUpsert, request: Request):
     _require_authenticated(request)
     _enforce_rate_limit(request, action="metric_override", limit=60, window_seconds=60)
-    if payload.period_id.startswith("rpt_"):
+    if project_id.startswith("rpt_"):
+        try:
+            report = report_library_store.get(project_id)["report"]
+        except ReportLibraryError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if payload.period_id != report["id"] or payload.campaign_id != "report_total":
+            raise HTTPException(status_code=422, detail="Metric scope ไม่ตรงกับรายงาน")
+    elif payload.period_id.startswith("rpt_"):
         try:
             report = report_library_store.get(payload.period_id)["report"]
         except ReportLibraryError as exc:
@@ -835,7 +874,7 @@ def update_campaign_metrics(project_id: str, payload: MetricOverrideUpsert, requ
 def create_custom_metric(project_id: str, payload: CustomMetricCreate, request: Request):
     _require_authenticated(request)
     _enforce_rate_limit(request, action="custom_metric", limit=20, window_seconds=60)
-    _require_project(project_id)
+    _require_element_owner(project_id)
     try:
         return metric_workspace_store.create_custom_metric(project_id, payload)
     except MetricWorkspaceError as exc:
@@ -905,6 +944,8 @@ def analyze(
         payload = _demo_payload(since_date, until_date, analysis_scope)
         if saved_report:
             payload["report"] = {key: saved_report[key] for key in ("id", "brand_id", "name", "date_from", "date_to", "status", "current_revision")}
+            if not payload.get("scope"):
+                _attach_report_total(payload, saved_report)
         return payload
 
     if analysis_scope:

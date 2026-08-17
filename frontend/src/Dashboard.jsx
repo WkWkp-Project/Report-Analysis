@@ -234,6 +234,8 @@ const campaignMetricValue = (key, value, definition) => {
 const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpiry }) => {
   const rows = data?.campaign_results || [];
   const definitions = data?.custom_metrics || [];
+  const metricOwnerId = data?.scope?.project_id || data?.report?.id;
+  const metricPeriodId = data?.scope?.period_id || data?.report?.id;
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState({});
   const [reason, setReason] = useState('แก้ไขหลังตรวจสอบข้อมูลนำเข้า');
@@ -266,7 +268,7 @@ const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpi
           const next = raw === '' ? null : Number(raw);
           if ((row[key] ?? null) !== next) values[key] = next;
         });
-        if (Object.keys(values).length) await updateCampaignMetrics(data.scope.project_id, { period_id: data.scope.period_id, campaign_id: row.campaign_id, values, reason: reason.trim() });
+        if (Object.keys(values).length) await updateCampaignMetrics(metricOwnerId, { period_id: metricPeriodId, campaign_id: row.campaign_id, values, reason: reason.trim() });
       }
       setEditing(false);
       await onRefresh();
@@ -281,7 +283,7 @@ const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpi
     setSaving(true);
     setError(null);
     try {
-      await createCustomMetric(data.scope.project_id, { ...formula, decimals: Number(formula.decimals) });
+      await createCustomMetric(metricOwnerId, { ...formula, decimals: Number(formula.decimals) });
       setFormula({ key: '', label: '', formula: 'revenue / spend', unit: 'ratio', decimals: 2 });
       setFormulaOpen(false);
       await onRefresh();
@@ -292,10 +294,10 @@ const CampaignResultsTable = ({ data, readOnly = false, onRefresh, onSessionExpi
     }
   };
 
-  if (!data?.scope) return null;
+  if (!metricOwnerId) return null;
   return <section className="campaign-results" aria-labelledby="campaign-results-title">
     <div className="campaign-results-heading">
-      <div><h2 id="campaign-results-title"><Table2 size={17} /> Campaign results</h2><p>{rows.length} Campaigns ที่ include อยู่ในรายงานนี้ · ค่าที่แก้เองมีเครื่องหมาย Manual และสูตรจะคำนวณใหม่อัตโนมัติ</p></div>
+      <div><h2 id="campaign-results-title"><Table2 size={17} /> {data?.scope ? 'Campaign results' : 'Detailed report metrics'}</h2><p>{data?.scope ? `${rows.length} Campaigns ที่ include อยู่ในรายงานนี้` : 'ยอดรวม Brand + Period ของรายงานนี้'} · ค่าที่แก้เองมีเครื่องหมาย Manual และสูตรจะคำนวณใหม่อัตโนมัติ</p></div>
       {!readOnly && <div className="campaign-admin-actions">
         {!editing ? <button type="button" onClick={beginEdit}><Pencil size={14} /> แก้ไขตัวเลข</button> : <><button type="button" onClick={() => setEditing(false)} disabled={saving}>ยกเลิก</button><button className="save" type="button" onClick={saveChanges} disabled={saving}>{saving ? <LoaderCircle className="button-spinner" size={14} /> : <Save size={14} />} บันทึก</button></>}
         <button type="button" onClick={() => setFormulaOpen(value => !value)}><Sigma size={14} /> สร้าง Metric</button>
